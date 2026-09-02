@@ -21,6 +21,8 @@ import (
 	reporting "github.com/gostafa/reusability/internal/features/reporting/application"
 	reportingdomain "github.com/gostafa/reusability/internal/features/reporting/domain"
 	"github.com/gostafa/reusability/internal/features/reporting/ports/outbound"
+	"github.com/gostafa/reusability/internal/infrastructure/browser"
+	"github.com/gostafa/reusability/internal/infrastructure/profiling"
 	"github.com/gostafa/reusability/internal/infrastructure/sinks"
 	"github.com/gostafa/reusability/internal/shared/metrics"
 	"github.com/gostafa/reusability/internal/shared/version"
@@ -44,16 +46,16 @@ func asConfig(set *flag.FlagSet, vals *flagValues, wts *reusability.Weights) reu
 	}
 }
 
-func analyzeAndReport(cfg *runtimeConfig) int {
+func analyzeAndReportWith(cfg *runtimeConfig, analyze analyzeFunc) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
 	defer stop()
 
-	return runPipeline(ctx, cfg)
+	return runPipeline(ctx, cfg, analyze)
 }
 
-func analyzeThenWrite(ctx context.Context, cfg *runtimeConfig) int {
-	report, code := runAnalyze(ctx, cfg)
+func analyzeThenWrite(ctx context.Context, cfg *runtimeConfig, analyze analyzeFunc) int {
+	report, code := runAnalyze(ctx, cfg, analyze)
 
 	if code != exitOK {
 		return code
@@ -68,7 +70,7 @@ func analyzeThenWrite(ctx context.Context, cfg *runtimeConfig) int {
 	return writeAndGate(ctx, cfg, &report)
 }
 
-func applyWebFormat(args buildArgs) (name string, code int, ok bool) {
+func applyWebFormat(args *buildArgs) (name string, code int, ok bool) {
 	name = *args.vals.format
 
 	if !*args.vals.webReport {
@@ -88,7 +90,7 @@ func applyWebFormat(args buildArgs) (name string, code int, ok bool) {
 	return string(reportingdomain.FormatWeb), exitOK, true
 }
 
-func resolveOutputPath(output string, format string) string {
+func resolveOutputPath(output, format string) string {
 	if output == emptyString && format == string(reportingdomain.FormatWeb) {
 		return defaultWebReportName
 	}
@@ -96,7 +98,7 @@ func resolveOutputPath(output string, format string) string {
 	return output
 }
 
-func buildRuntime(args buildArgs) parseResult {
+func buildRuntime(args *buildArgs) parseResult {
 	formatOutcome := resolveReportFormat(args)
 
 	if !formatOutcome.ok {
@@ -109,7 +111,7 @@ func buildRuntime(args buildArgs) parseResult {
 		return doneParse(gatingOutcome.code)
 	}
 
-	return finishRuntime(&args, &formatOutcome, &gatingOutcome)
+	return finishRuntime(args, &formatOutcome, &gatingOutcome)
 }
 
 func buildWriteRequest(cfg *runtimeConfig, report *reusability.Report) *reporting.WriteRequest {
@@ -119,7 +121,7 @@ func buildWriteRequest(cfg *runtimeConfig, report *reusability.Report) *reportin
 		Sink:   reportSink(cfg.output),
 		Options: reportingdomain.TextOptions{
 			Color: cfg.output == emptyString && os.Getenv("NO_COLOR") == emptyString &&
-				isTerminalFn(),
+				stdoutIsTerminal(),
 			Explain: cfg.explain,
 		},
 	}
@@ -153,13 +155,17 @@ func enforcePolicy(ctx context.Context, cfg *runtimeConfig, report *reusability.
 }
 
 func execute(args []string) int {
+	return executeWithAnalyze(args, reusability.Analyze)
+}
+
+func executeWithAnalyze(args []string, analyze analyzeFunc) int {
 	parsed := parseCLI(args)
 
 	if parsed.done {
 		return parsed.code
 	}
 
-	return analyzeAndReport(&parsed.cfg)
+	return analyzeAndReportWith(&parsed.cfg, analyze)
 }
 
 func failAnalyze(ctx context.Context, logger *slog.Logger, err error) int {
@@ -177,7 +183,7 @@ func failAnalyze(ctx context.Context, logger *slog.Logger, err error) int {
 }
 
 func finalizeHelpDocs(file *os.File, path string) (string, error) {
-	err := closeHelpFileFn(file)
+	err := closeOSFile(file)
 	if err != nil {
 		return emptyString, fmt.Errorf("close help temp: %w", err)
 	}
@@ -197,25 +203,30 @@ func finishRuntime(args *buildArgs, format *formatResult, gating *gatingResult) 
 		return doneParse(weightsOutcome.code)
 	}
 
-	vals := args.vals
-	patterns, mins := ruleSlices(gating.rules)
+	args.format = format
+	args.gating = gating
 
-	return parseResult{
-		cfg: runtimeConfig{
-			logger:        args.logger,
-			format:        format.format,
-			output:        resolveOutputPath(*vals.output, format.format),
-			explain:       *vals.explain,
-			analysis:      asConfig(args.flagSet, vals, &weightsOutcome.weights),
-			gating:        *vals.check,
-			rulePatterns:  patterns,
-			ruleMins:      mins,
-			policySource:  gating.source,
-			cpuProfile:    *vals.cpuProfile,
-			memoryProfile: *vals.memoryProfile,
-			webToDefault: *vals.output == emptyString &&
-				format.format == string(reportingdomain.FormatWeb),
-		},
+	return parseResult{cfg: runtimeConfiguration(args, &weightsOutcome.weights)}
+}
+
+func runtimeConfiguration(args *buildArgs, weights *reusability.Weights) runtimeConfig {
+	vals := args.vals
+	patterns, mins := ruleSlices(args.gating.rules)
+
+	return runtimeConfig{
+		logger:        args.logger,
+		format:        args.format.format,
+		output:        resolveOutputPath(*vals.output, args.format.format),
+		explain:       *vals.explain,
+		analysis:      asConfig(args.flagSet, vals, weights),
+		gating:        *vals.check,
+		rulePatterns:  patterns,
+		ruleMins:      mins,
+		policySource:  args.gating.source,
+		cpuProfile:    *vals.cpuProfile,
+		memoryProfile: *vals.memoryProfile,
+		webToDefault: *vals.output == emptyString &&
+			args.format.format == string(reportingdomain.FormatWeb),
 	}
 }
 
@@ -259,7 +270,7 @@ func maybeStartCPU(ctx context.Context, cfg *runtimeConfig) (stop func() error, 
 		return nil, exitOK
 	}
 
-	stopProfile, err := startCPUFn(cfg.cpuProfile)
+	stopProfile, err := profiling.StartCPU(cfg.cpuProfile)
 	if err != nil {
 		cfg.logger.ErrorContext(
 			ctx,
@@ -273,13 +284,13 @@ func maybeStartCPU(ctx context.Context, cfg *runtimeConfig) (stop func() error, 
 	return stopProfile, exitOK
 }
 
-func newFlagSet() (*flag.FlagSet, *flagValues) {
-	flagSet := flag.NewFlagSet("reusability", flag.ContinueOnError)
+func newFlagSet() (flagSet *flag.FlagSet, vals *flagValues) {
+	flagSet = flag.NewFlagSet("reusability", flag.ContinueOnError)
 	flagSet.SetOutput(os.Stderr)
 
 	flagSet.Usage = func() { printUsage(flagSet) }
 
-	vals := &flagValues{}
+	vals = &flagValues{}
 	registerReportFlags(flagSet, vals)
 	registerWeightFlags(flagSet, vals)
 	registerAnalysisFlags(flagSet, vals)
@@ -304,11 +315,11 @@ func newLogger(level slog.Leveler) *slog.Logger {
 }
 
 func openHelpIfTerminal(logger *slog.Logger, path string) {
-	if !isTerminalFn() {
+	if !stdoutIsTerminal() {
 		return
 	}
 
-	err := openBrowserFn(path)
+	err := browser.Open(path)
 	if err != nil {
 		logger.WarnContext(
 			context.Background(),
@@ -319,11 +330,11 @@ func openHelpIfTerminal(logger *slog.Logger, path string) {
 }
 
 func openWebBrowser(ctx context.Context, cfg *runtimeConfig) {
-	if !isTerminalFn() {
+	if !stdoutIsTerminal() {
 		return
 	}
 
-	err := openBrowserFn(cfg.output)
+	err := browser.Open(cfg.output)
 	if err != nil {
 		cfg.logger.WarnContext(
 			ctx,
@@ -358,7 +369,7 @@ func parseCLI(args []string) parseResult {
 		return parseVersion()
 	}
 
-	return buildRuntime(buildArgs{flagSet: flagSet, vals: vals, logger: loggerFor(vals)})
+	return buildRuntime(&buildArgs{flagSet: flagSet, vals: vals, logger: loggerFor(vals)})
 }
 
 func parseHelpOrUsage(err error, args []string) parseResult {
@@ -537,7 +548,7 @@ func registerWeightFlags(flagSet *flag.FlagSet, vals *flagValues) {
 func renderHelpDocs(path string) (string, error) {
 	fileSink := sinks.FileSink{Path: path}
 
-	err := writeDocsFn(outbound.NewSink(fileSink.Open), version.Version())
+	err := reporting.WriteDocs(outbound.NewSink(fileSink.Open), version.Version())
 	if err != nil {
 		return emptyString, fmt.Errorf("write help docs: %w", err)
 	}
@@ -574,33 +585,34 @@ func resolveGating(vals *flagValues, logger *slog.Logger) gatingResult {
 	return gatingResult{rules: resolved, source: source, ok: true}
 }
 
-func resolvePolicy(rules ruleList) ([]ruleSpec, string, error) {
+func resolvePolicy(rules ruleList) (specs []ruleSpec, source string, err error) {
 	if len(rules.items) == exitOK {
 		return nil, emptyString, errNoPolicyRules
 	}
 
-	out := make([]ruleSpec, exitOK, len(rules.items))
+	specs = append([]ruleSpec(nil), rules.items...)
 
-	out = append(out, rules.items...)
+	domainRules := policyDomainRules(specs)
 
-	domainRules := make([]policydomain.Rule, exitOK, len(out))
-
-	for i := range out {
-		domainRules = append(domainRules, policydomain.Rule{
-			Pattern: out[i].pattern,
-			Min:     out[i].minimum,
-		})
-	}
-
-	err := policydomain.Validate(domainRules)
+	err = policydomain.Validate(domainRules)
 	if err != nil {
 		return nil, emptyString, fmt.Errorf("validate policy: %w", err)
 	}
 
-	return out, policySourceFlagRules, nil
+	return specs, policySourceFlagRules, nil
 }
 
-func resolveReportFormat(args buildArgs) formatResult {
+func policyDomainRules(specs []ruleSpec) []policydomain.Rule {
+	rules := make([]policydomain.Rule, exitOK, len(specs))
+
+	for i := range specs {
+		rules = append(rules, policydomain.Rule{Pattern: specs[i].pattern, Min: specs[i].minimum})
+	}
+
+	return rules
+}
+
+func resolveReportFormat(args *buildArgs) formatResult {
 	name, code, ok := applyWebFormat(args)
 
 	if !ok {
@@ -657,10 +669,14 @@ func ruleSlices(rules []ruleSpec) (patterns []string, mins []float64) {
 	return patterns, mins
 }
 
-func runAnalyze(ctx context.Context, cfg *runtimeConfig) (report reusability.Report, code int) {
+func runAnalyze(
+	ctx context.Context,
+	cfg *runtimeConfig,
+	analyze analyzeFunc,
+) (report reusability.Report, code int) {
 	start := time.Now()
 
-	report, err := analyzeFn(ctx, &cfg.analysis)
+	report, err := analyze(ctx, &cfg.analysis)
 	if err != nil {
 		return reusability.Report{}, failAnalyze(ctx, cfg.logger, err)
 	}
@@ -675,7 +691,7 @@ func runAnalyze(ctx context.Context, cfg *runtimeConfig) (report reusability.Rep
 	return report, exitOK
 }
 
-func runPipeline(ctx context.Context, cfg *runtimeConfig) int {
+func runPipeline(ctx context.Context, cfg *runtimeConfig, analyze analyzeFunc) int {
 	stopCPU, code := maybeStartCPU(ctx, cfg)
 
 	if code != exitOK {
@@ -686,7 +702,7 @@ func runPipeline(ctx context.Context, cfg *runtimeConfig) int {
 		defer stopCPUProfile(ctx, cfg.logger, stopCPU)
 	}
 
-	return analyzeThenWrite(ctx, cfg)
+	return analyzeThenWrite(ctx, cfg, analyze)
 }
 
 func runWebHelp() int {
@@ -809,7 +825,7 @@ func writeHeapIfNeeded(ctx context.Context, cfg *runtimeConfig) int {
 		return exitOK
 	}
 
-	err := writeHeapFn(cfg.memoryProfile)
+	err := profiling.WriteHeap(cfg.memoryProfile)
 	if err != nil {
 		cfg.logger.ErrorContext(
 			ctx,
@@ -824,7 +840,7 @@ func writeHeapIfNeeded(ctx context.Context, cfg *runtimeConfig) int {
 }
 
 func writeHelpDocs() (string, error) {
-	file, err := createHelpTempFn(emptyString, helpTempPattern)
+	file, err := os.CreateTemp(emptyString, helpTempPattern)
 	if err != nil {
 		return emptyString, fmt.Errorf("create help temp: %w", err)
 	}

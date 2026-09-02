@@ -5,12 +5,6 @@ package cli
 
 import (
 	"errors"
-	"os"
-
-	reporting "github.com/gostafa/reusability/internal/features/reporting/application"
-	"github.com/gostafa/reusability/internal/infrastructure/browser"
-	"github.com/gostafa/reusability/internal/infrastructure/profiling"
-	"github.com/gostafa/reusability/reusability"
 )
 
 var (
@@ -20,14 +14,4 @@ var (
 		"no policy rules configured; pass at least one -rule=pattern:min with -check",
 	)
 	errShortWrite = errors.New("fprint: short write")
-
-	// Test hooks — override in tests; production uses the defaults below.
-	analyzeFn        = reusability.Analyze
-	isTerminalFn     = stdoutIsTerminal
-	createHelpTempFn = os.CreateTemp
-	closeHelpFileFn  = closeOSFile
-	writeDocsFn      = reporting.WriteDocs
-	openBrowserFn    = browser.Open
-	startCPUFn       = profiling.StartCPU
-	writeHeapFn      = profiling.WriteHeap
 )

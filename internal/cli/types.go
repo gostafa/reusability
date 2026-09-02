@@ -4,6 +4,7 @@
 package cli
 
 import (
+	"context"
 	"flag"
 	"log/slog"
 
@@ -11,6 +12,8 @@ import (
 )
 
 type (
+	analyzeFunc func(context.Context, *reusability.Config) (reusability.Report, error)
+
 	ruleSpec = struct {
 		pattern string
 		minimum float64
@@ -90,5 +93,7 @@ type (
 		flagSet *flag.FlagSet
 		vals    *flagValues
 		logger  *slog.Logger
+		format  *formatResult
+		gating  *gatingResult
 	}
 )

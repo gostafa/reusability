@@ -23,7 +23,9 @@ func Write(req *WriteRequest) error {
 		return fmt.Errorf("open sink: %w", err)
 	}
 
-	renderErr := render(writer, &req.Report, req.Format, req.Options)
+	renderErr := render(&renderInput{
+		writer: writer, report: &req.Report, format: req.Format, opts: req.Options,
+	})
 	closeErr := writer.Close()
 
 	if renderErr != nil {
@@ -160,13 +162,8 @@ func metricJSON(metric *reusability.MetricResult) jsonMetric {
 	return out
 }
 
-func render(
-	writer io.Writer,
-	report *reusability.Report,
-	format domain.Format,
-	opts domain.TextOptions,
-) error {
-	err := dispatchRender(writer, report, format, opts)
+func render(input *renderInput) error {
+	err := dispatchRender(input)
 	if err != nil {
 		return fmt.Errorf("render: %w", err)
 	}
@@ -174,24 +171,36 @@ func render(
 	return nil
 }
 
-func dispatchRender(
-	writer io.Writer,
-	report *reusability.Report,
-	format domain.Format,
-	opts domain.TextOptions,
-) error {
-	switch format {
-	case domain.FormatText:
-		return renderText(writer, report, opts)
-	case domain.FormatJSON:
-		return renderJSON(writer, report)
-	case domain.FormatCSV:
-		return renderCSV(writer, report)
-	case domain.FormatWeb:
-		return renderWeb(writer, report)
-	default:
-		return fmt.Errorf("%w: %q", errUnknownFormat, format)
+func dispatchRender(input *renderInput) error {
+	return renderStructured(input)
+}
+
+func renderStructured(input *renderInput) error {
+	renderer, ok := rendererFor(input)
+
+	if !ok {
+		return fmt.Errorf("%w: %q", errUnknownFormat, input.format)
 	}
+
+	err := renderer()
+	if err != nil {
+		return fmt.Errorf("render %s: %w", input.format, err)
+	}
+
+	return nil
+}
+
+func rendererFor(input *renderInput) (func() error, bool) {
+	renderers := map[domain.Format]func() error{
+		domain.FormatText: func() error { return renderText(input.writer, input.report, input.opts) },
+		domain.FormatJSON: func() error { return renderJSON(input.writer, input.report) },
+		domain.FormatCSV:  func() error { return renderCSV(input.writer, input.report) },
+		domain.FormatWeb:  func() error { return renderWeb(input.writer, input.report) },
+	}
+
+	renderer, ok := renderers[input.format]
+
+	return renderer, ok
 }
 
 func renderText(writer io.Writer, report *reusability.Report, opts domain.TextOptions) error {

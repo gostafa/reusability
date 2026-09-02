@@ -4,6 +4,15 @@
 package metrics
 
 type (
+	reusabilityResultInput = struct {
+		spec      metricSpec
+		inputs    []weightedComponent
+		dropped   []ReusabilityComponent
+		details   []string
+		names     []string
+		weightSum float64
+	}
+
 	// Validator checks that a value is internally consistent.
 	Validator interface {
 		Validate() error

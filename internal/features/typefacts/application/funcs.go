@@ -99,13 +99,7 @@ func packageFacts(
 	idByKey map[string]int,
 	pkgID, typeID int,
 ) (pkg domain.PackageFacts, nextTypeID int) {
-	pkg = domain.PackageFacts{
-		ID:       pkgID,
-		Path:     extract.Path,
-		InModule: extract.InModule,
-		Imports:  sortedUnique(extract.Imports, extract.Path),
-		TypeIDs:  make([]int, zero, len(extract.Types)),
-	}
+	pkg = newPackageFacts(extract, pkgID)
 
 	for index := range extract.Types {
 		pkg.TypeIDs = append(pkg.TypeIDs, typeID)
@@ -119,6 +113,16 @@ func packageFacts(
 	}
 
 	return pkg, typeID
+}
+
+func newPackageFacts(extract *domain.PackageExtract, pkgID int) domain.PackageFacts {
+	return domain.PackageFacts{
+		ID:       pkgID,
+		Path:     extract.Path,
+		InModule: extract.InModule,
+		Imports:  sortedUnique(extract.Imports, extract.Path),
+		TypeIDs:  make([]int, zero, len(extract.Types)),
+	}
 }
 
 func resolveKeys(keys []string, idByKey map[string]int) []int {

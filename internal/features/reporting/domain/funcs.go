@@ -262,7 +262,7 @@ func writeTextFooter(
 	return nil
 }
 
-func writeNALegend(builder *strings.Builder, color bool, sawNA bool) error {
+func writeNALegend(builder *strings.Builder, color, sawNA bool) error {
 	if !sawNA {
 		return nil
 	}

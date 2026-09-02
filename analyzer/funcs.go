@@ -45,10 +45,15 @@ func New(settings *Settings) (*analysis.Analyzer, error) {
 // UnmarshalSettings accepts snake_case tags and remaps kebab-case keys from
 // golangci-lint settings so DisallowUnknownFields still applies.
 func UnmarshalSettings(data []byte, settings *Settings) error {
-	return unmarshalSettings(settings, data)
+	err := decodeUnmarshaledSettings(settings, data)
+	if err != nil {
+		return fmt.Errorf("decode settings: %w", err)
+	}
+
+	return nil
 }
 
-func unmarshalSettings(settings *Settings, data []byte) error {
+func decodeUnmarshaledSettings(settings *Settings, data []byte) error {
 	remapped, err := remapKebabKeys(data)
 	if err != nil {
 		return fmt.Errorf(errFmtUnmarshal, err)

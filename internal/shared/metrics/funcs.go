@@ -175,10 +175,14 @@ func Reusability(in *ReusabilityInput) MetricResult {
 	spec := metricSpec{MetricReusability, ScopeType, DefinitionReusability}
 
 	if weightSum == zero {
-		return reusabilityUnavailable(spec, inputs, dropped, details)
+		return reusabilityUnavailable(&reusabilityResultInput{
+			spec: spec, inputs: inputs, dropped: dropped, details: details,
+		})
 	}
 
-	return reusabilityValue(spec, inputs, weightSum, names)
+	return reusabilityValue(&reusabilityResultInput{
+		spec: spec, inputs: inputs, weightSum: weightSum, names: names,
+	})
 }
 
 // Validate reports an error when any weight is negative or when the weights
@@ -341,48 +345,38 @@ func orderedSeen(seen map[string]bool) []string {
 	return closure
 }
 
-func reusabilityUnavailable(
-	spec metricSpec,
-	inputs []weightedComponent,
-	dropped []ReusabilityComponent,
-	details []string,
-) MetricResult {
-	if len(dropped) == len(inputs) {
+func reusabilityUnavailable(input *reusabilityResultInput) MetricResult {
+	if len(input.dropped) == len(input.inputs) {
 		return notApplicable(
-			&spec,
-			"every component dropped: "+strings.Join(details, listSep),
+			&input.spec,
+			"every component dropped: "+strings.Join(input.details, listSep),
 		)
 	}
 
 	return notApplicable(
-		&spec,
+		&input.spec,
 		"the applicable components have zero total weight; dropped: "+strings.Join(
-			details,
+			input.details,
 			listSep,
 		),
 	)
 }
 
-func reusabilityValue(
-	spec metricSpec,
-	inputs []weightedComponent,
-	weightSum float64,
-	names []string,
-) MetricResult {
+func reusabilityValue(input *reusabilityResultInput) MetricResult {
 	var value float64
 
-	for i := range inputs {
-		in := &inputs[i]
+	for i := range input.inputs {
+		in := &input.inputs[i]
 
 		if in.component.Applicable {
-			value += in.weight / weightSum * in.component.Value
+			value += in.weight / input.weightSum * in.component.Value
 		}
 	}
 
-	result := applicable(&spec, value)
+	result := applicable(&input.spec, value)
 
-	if len(names) > zero {
-		result.Reason = "dropped components: " + strings.Join(names, listSep)
+	if len(input.names) > zero {
+		result.Reason = "dropped components: " + strings.Join(input.names, listSep)
 	}
 
 	return result

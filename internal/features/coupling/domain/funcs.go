@@ -19,7 +19,16 @@ func BuildDependencyGraph(facts *typefacts.ProjectFacts, scope Scope) Dependency
 	graph := DependencyGraph{Couplings: make([]Coupling, len(facts.Packages))}
 
 	for index := range facts.Packages {
-		addPackageEdges(&graph, facts, analyzed, scope, index)
+		addPackageEdges(&struct {
+			graph    *DependencyGraph
+			facts    *typefacts.ProjectFacts
+			analyzed map[string]int
+			scope    Scope
+			path     string
+			pkgID    int
+		}{
+			graph: &graph, facts: facts, analyzed: analyzed, scope: scope, pkgID: index,
+		})
 	}
 
 	return graph
@@ -45,30 +54,34 @@ func (graph DependencyGraph) Coupling(packageID int) Coupling {
 	return graph.Couplings[packageID]
 }
 
-func addPackageEdges(
-	graph *DependencyGraph,
-	facts *typefacts.ProjectFacts,
-	analyzed map[string]int,
-	scope Scope,
-	pkgID int,
+func addPackageEdges(input *struct {
+	graph    *DependencyGraph
+	facts    *typefacts.ProjectFacts
+	analyzed map[string]int
+	scope    Scope
+	path     string
+	pkgID    int
+},
 ) {
-	imports := facts.Packages[pkgID].Imports
+	imports := input.facts.Packages[input.pkgID].Imports
 
 	for index := range imports {
-		recordEdge(graph, facts, analyzed, scope, pkgID, imports[index])
+		input.path = imports[index]
+		recordEdge(input)
 	}
 }
 
-func recordEdge(
-	graph *DependencyGraph,
-	facts *typefacts.ProjectFacts,
-	analyzed map[string]int,
-	scope Scope,
-	pkgID int,
-	path string,
+func recordEdge(input *struct {
+	graph    *DependencyGraph
+	facts    *typefacts.ProjectFacts
+	analyzed map[string]int
+	scope    Scope
+	path     string
+	pkgID    int
+},
 ) {
-	recordAfferent(graph, analyzed, path)
-	recordEfferent(graph, facts, analyzed, scope, pkgID, path)
+	recordAfferent(input.graph, input.analyzed, input.path)
+	recordEfferent(input)
 }
 
 func recordAfferent(graph *DependencyGraph, analyzed map[string]int, path string) {
@@ -77,20 +90,24 @@ func recordAfferent(graph *DependencyGraph, analyzed map[string]int, path string
 	}
 }
 
-func recordEfferent(
-	graph *DependencyGraph,
-	facts *typefacts.ProjectFacts,
-	analyzed map[string]int,
-	scope Scope,
-	pkgID int,
-	path string,
+func recordEfferent(input *struct {
+	graph    *DependencyGraph
+	facts    *typefacts.ProjectFacts
+	analyzed map[string]int
+	scope    Scope
+	path     string
+	pkgID    int
+},
 ) {
 	check := &scopeCheck{
-		path: path, scope: scope, modulePath: facts.ModulePath, analyzed: analyzed,
+		path:       input.path,
+		scope:      input.scope,
+		modulePath: input.facts.ModulePath,
+		analyzed:   input.analyzed,
 	}
 
 	if inScope(check) {
-		graph.Couplings[pkgID].Efferent++
+		input.graph.Couplings[input.pkgID].Efferent++
 	}
 }
 

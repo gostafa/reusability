@@ -123,6 +123,13 @@ type (
 		dryRun  bool
 	}
 
+	commitInput = struct {
+		pkg     *packageInfo
+		writes  []writeOp
+		deletes []string
+		opts    runOptions
+	}
+
 	docSectionsInput struct {
 		license string
 		pkgName string

@@ -37,7 +37,8 @@ func TestComputeDerivesCBOAndIndex(t *testing.T) {
 		DocumentedExportedMembers: 3,
 	}
 
-	got := Compute(tf, metrics.DefaultReusabilityWeights(), "direct")
+	weights := metrics.DefaultReusabilityWeights()
+	got := Compute(tf, &weights, "direct")
 
 	if got.CBO != metrics.CBO(len(tf.ReferencedTypeIDs)) {
 		t.Errorf("CBO = %+v, want %+v", got.CBO, metrics.CBO(3))
@@ -55,7 +56,8 @@ func TestComputeDropsNotApplicableComponents(t *testing.T) {
 
 	tf := &typefacts.TypeFacts{ExportedMembers: 2, DocumentedExportedMembers: 1}
 
-	got := Compute(tf, metrics.DefaultReusabilityWeights(), "direct")
+	weights := metrics.DefaultReusabilityWeights()
+	got := Compute(tf, &weights, "direct")
 
 	if got.CBO != metrics.CBO(0) {
 		t.Errorf("CBO = %+v, want %+v", got.CBO, metrics.CBO(0))
@@ -83,7 +85,7 @@ func TestComputeIndexRewardsQuality(t *testing.T) {
 			Fields: fields, Methods: methods,
 			ExportedMembers: 4, DocumentedExportedMembers: 4,
 		},
-		weights,
+		&weights,
 		"direct",
 	)
 	poor := Compute(
@@ -93,7 +95,7 @@ func TestComputeIndexRewardsQuality(t *testing.T) {
 			Methods:           methods,
 			ExportedMembers:   4, DocumentedExportedMembers: 0,
 		},
-		weights,
+		&weights,
 		"direct",
 	)
 

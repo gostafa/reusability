@@ -4,8 +4,9 @@
 package main
 
 const (
-	licenseLine1 = "// Gostafa 2026."
-	licenseLine2 = "// SPDX-License-Identifier: Apache-2.0."
+	errFmtCommitRunner = "commit runner: %w"
+	licenseLine1       = "// Gostafa 2026."
+	licenseLine2       = "// SPDX-License-Identifier: Apache-2.0."
 
 	emptyString         = ""
 	newline             = "\n"

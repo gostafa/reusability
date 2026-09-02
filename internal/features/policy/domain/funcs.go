@@ -210,21 +210,30 @@ func splitPattern(pattern string) []string {
 }
 
 func matchingRule(importPath string, rules []Rule) (threshold float64, pattern string) {
-	var matched bool
-
 	for index := range rules {
-		if !MatchPackage(rules[index].Pattern, importPath) {
+		rule := matchingCandidate(&rules[index], importPath, pattern)
+
+		if rule == nil {
 			continue
 		}
 
-		if !matched || moreSpecific(rules[index].Pattern, pattern) {
-			threshold = rules[index].Min
-			pattern = rules[index].Pattern
-			matched = true
-		}
+		threshold = rule.Min
+		pattern = rule.Pattern
 	}
 
 	return threshold, pattern
+}
+
+func matchingCandidate(rule *Rule, importPath, currentPattern string) *Rule {
+	if !MatchPackage(rule.Pattern, importPath) {
+		return nil
+	}
+
+	if currentPattern != emptyString && !moreSpecific(rule.Pattern, currentPattern) {
+		return nil
+	}
+
+	return rule
 }
 
 func moreSpecific(candidate, current string) bool {
@@ -245,10 +254,13 @@ func moreSpecific(candidate, current string) bool {
 }
 
 func patternSpecificity(pattern string) (literal, wildcards, segments int) {
-	for _, segment := range splitPattern(pattern) {
+	segmentsList := splitPattern(pattern)
+
+	for index := range segmentsList {
+		segment := &segmentsList[index]
 		segments++
 
-		if segment == star || segment == doubleStar {
+		if *segment == star || *segment == doubleStar {
 			wildcards++
 
 			continue

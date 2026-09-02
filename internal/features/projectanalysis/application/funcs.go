@@ -18,9 +18,18 @@ import (
 
 // NewPipeline returns a pipeline backed by the given fact collector.
 func NewPipeline(facts typefacts.Collector) *Pipeline {
+	return newPipeline(facts, workerpool.Run)
+}
+
+func newPipeline(
+	facts typefacts.Collector,
+	runWorkers func(context.Context, workerpool.RunConfig) error,
+) *Pipeline {
 	return &Pipeline{
 		analyze: func(ctx context.Context, opts *inbound.Options) (inbound.Result, error) {
-			return runPipeline(ctx, facts, opts)
+			return runPipeline(ctx, &pipelineInput{
+				facts: facts, opts: opts, runWorkers: runWorkers,
+			})
 		},
 	}
 }
@@ -30,27 +39,36 @@ func (pipeline *Pipeline) Analyze(
 	ctx context.Context,
 	opts *inbound.Options,
 ) (inbound.Result, error) {
-	return pipeline.analyze(ctx, opts)
+	result, err := pipeline.analyze(ctx, opts)
+	if err != nil {
+		return inbound.Result{}, fmt.Errorf("pipeline analyze: %w", err)
+	}
+
+	return result, nil
 }
 
-func runPipeline(
-	ctx context.Context,
-	facts typefacts.Collector,
-	opts *inbound.Options,
-) (inbound.Result, error) {
+func runPipeline(ctx context.Context, input *pipelineInput) (inbound.Result, error) {
 	compute := nameSet(metrics.Closure([]string{metrics.MetricReusability}))
 
-	calculator, err := newReusabilityCalculator(compute, &opts.Weights)
+	calculator, err := newReusabilityCalculator(compute, &input.opts.Weights)
 	if err != nil {
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAnalyze, err)
 	}
 
-	projectFacts, err := loadFacts(ctx, facts, opts)
+	return runPreparedPipeline(ctx, input, calculator)
+}
+
+func runPreparedPipeline(
+	ctx context.Context,
+	input *pipelineInput,
+	calculator *reusability.Service,
+) (inbound.Result, error) {
+	projectFacts, err := loadFacts(ctx, input.facts, input.opts)
 	if err != nil {
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAnalyze, err)
 	}
 
-	result, err := assembleResult(ctx, projectFacts, calculator, opts)
+	result, err := assembleResult(ctx, input, projectFacts, calculator)
 	if err != nil {
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAssemble, err)
 	}
@@ -73,20 +91,15 @@ func loadFacts(
 	return &facts, nil
 }
 
-func analyzePackage(
-	facts *tfdomain.ProjectFacts,
-	pkgID int,
-	calculator *reusability.Service,
-	opts *inbound.Options,
-) inbound.PackageResult {
-	pkg := &facts.Packages[pkgID]
+func analyzePackage(input *packageAnalysisInput) inbound.PackageResult {
+	pkg := &input.facts.Packages[input.pkgID]
 	result := inbound.PackageResult{Path: pkg.Path}
 
 	result.Types = make([]inbound.TypeResult, zero, len(pkg.TypeIDs))
 
 	for index := range pkg.TypeIDs {
 		result.Types = append(result.Types, analyzeType(
-			&facts.Types[pkg.TypeIDs[index]], calculator, opts,
+			&input.facts.Types[pkg.TypeIDs[index]], input.calculator, input.pipeline.opts,
 		))
 	}
 
@@ -106,16 +119,16 @@ func analyzeType(
 
 func assembleResult(
 	ctx context.Context,
+	input *pipelineInput,
 	facts *tfdomain.ProjectFacts,
 	calculator *reusability.Service,
-	opts *inbound.Options,
 ) (inbound.Result, error) {
 	err := ctx.Err()
 	if err != nil {
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAssemble, err)
 	}
 
-	packageResults, err := fillPackageResults(ctx, facts, calculator, opts)
+	packageResults, err := fillPackageResults(ctx, input, facts, calculator)
 	if err != nil {
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAssemble, err)
 	}
@@ -145,9 +158,9 @@ func fieldUsageMode(opts *inbound.Options) string {
 
 func fillPackageResults(
 	ctx context.Context,
+	input *pipelineInput,
 	facts *tfdomain.ProjectFacts,
 	calculator *reusability.Service,
-	opts *inbound.Options,
 ) ([]inbound.PackageResult, error) {
 	packageResults := make([]inbound.PackageResult, zero, len(facts.Packages))
 
@@ -155,7 +168,9 @@ func fillPackageResults(
 		packageResults = append(packageResults, inbound.PackageResult{})
 	}
 
-	err := runWorkers(ctx, packageWorkerConfig(facts, calculator, opts, packageResults))
+	err := input.runWorkers(ctx, packageWorkerConfig(&workerConfigInput{
+		pipeline: input, facts: facts, calculator: calculator, packageResults: packageResults,
+	}))
 	if err != nil {
 		return nil, fmt.Errorf("fill packages: %w", err)
 	}
@@ -191,17 +206,17 @@ func newReusabilityCalculator(
 	return service, nil
 }
 
-func packageWorkerConfig(
-	facts *tfdomain.ProjectFacts,
-	calculator *reusability.Service,
-	opts *inbound.Options,
-	packageResults []inbound.PackageResult,
-) workerpool.RunConfig {
+func packageWorkerConfig(input *workerConfigInput) workerpool.RunConfig {
 	return workerpool.RunConfig{
-		Workers:   workerpool.Workers(opts.Workers, len(facts.Packages)),
-		TaskCount: len(facts.Packages),
+		Workers:   workerpool.Workers(input.pipeline.opts.Workers, len(input.facts.Packages)),
+		TaskCount: len(input.facts.Packages),
 		Fn: func(index int) error {
-			packageResults[index] = analyzePackage(facts, index, calculator, opts)
+			input.packageResults[index] = analyzePackage(&packageAnalysisInput{
+				pipeline:   input.pipeline,
+				facts:      input.facts,
+				calculator: input.calculator,
+				pkgID:      index,
+			})
 
 			return nil
 		},

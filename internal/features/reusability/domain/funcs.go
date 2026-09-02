@@ -10,52 +10,58 @@ import (
 	"github.com/gostafa/reusability/internal/shared/metrics"
 )
 
-const zero = 0
+const (
+	zero = 0
+)
 
 // Compute derives AMC and LCOM from type facts, derives CBO from referenced
 // types, assembles the four components (dropping the not-applicable ones),
 // and evaluates the index with renormalized weights. fieldUsage is
 // "direct" or "transitive".
 func Compute(
-	tf *typefacts.TypeFacts,
-	weights metrics.ReusabilityWeights,
+	typeFacts *typefacts.TypeFacts,
+	weights *metrics.ReusabilityWeights,
 	fieldUsage string,
 ) Result {
-	amc := typeAMC(tf)
-	lcom := typeLCOM(tf, fieldUsage)
-	cbo := len(tf.ReferencedTypeIDs)
+	amc := typeAMC(typeFacts)
+	lcom := typeLCOM(typeFacts, fieldUsage)
+	cbo := len(typeFacts.ReferencedTypeIDs)
 
 	return Result{
 		CBO: metrics.CBO(cbo),
 		Reusability: metrics.Reusability(&metrics.ReusabilityInput{
-			Cohesion:    metrics.CohesionComponent(&lcom),
-			Coupling:    metrics.CouplingComponent(cbo),
-			Testability: metrics.TestabilityComponent(&amc),
-			Documentation: metrics.DocumentationComponent(
-				tf.DocumentedExportedMembers,
-				tf.ExportedMembers,
-			),
-			Weights: weights,
+			Cohesion:      metrics.CohesionComponent(&lcom),
+			Coupling:      metrics.CouplingComponent(cbo),
+			Testability:   metrics.TestabilityComponent(&amc),
+			Documentation: documentationComponent(typeFacts),
+			Weights:       *weights,
 		}),
 	}
 }
 
-func typeAMC(tf *typefacts.TypeFacts) metrics.MetricResult {
-	total := zero
-
-	for index := range tf.Methods {
-		total += complexity.Cyclomatic(&tf.Methods[index].Branches)
-	}
-
-	return metrics.AMC(total, len(tf.Methods))
+func documentationComponent(typeFacts *typefacts.TypeFacts) metrics.ReusabilityComponent {
+	return metrics.DocumentationComponent(
+		typeFacts.DocumentedExportedMembers,
+		typeFacts.ExportedMembers,
+	)
 }
 
-func typeLCOM(tf *typefacts.TypeFacts, fieldUsage string) metrics.MetricResult {
-	sets := cohesion.EffectiveFieldSets(tf, cohesion.FieldUsageMode(fieldUsage))
+func typeAMC(typeFacts *typefacts.TypeFacts) metrics.MetricResult {
+	total := zero
+
+	for index := range typeFacts.Methods {
+		total += complexity.Cyclomatic(&typeFacts.Methods[index].Branches)
+	}
+
+	return metrics.AMC(total, len(typeFacts.Methods))
+}
+
+func typeLCOM(typeFacts *typefacts.TypeFacts, fieldUsage string) metrics.MetricResult {
+	sets := cohesion.EffectiveFieldSets(typeFacts, cohesion.FieldUsageMode(fieldUsage))
 
 	return metrics.LCOM(
 		cohesion.TotalFieldAccesses(sets),
-		len(tf.Fields),
-		len(tf.Methods),
+		len(typeFacts.Fields),
+		len(typeFacts.Methods),
 	)
 }

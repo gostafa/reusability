@@ -101,7 +101,7 @@ func newProdScanResult(
 	}
 }
 
-func parseProdDecls(input *prodParseInput) ([]pkgDecl, string, error) {
+func parseProdDecls(input *prodParseInput) (decls []pkgDecl, doc string, err error) {
 	allDecls, packageDoc, err := accumulateProdDecls(input)
 	if err != nil {
 		return nil, emptyString, fmt.Errorf("accumulate prod: %w", err)
@@ -110,7 +110,7 @@ func parseProdDecls(input *prodParseInput) ([]pkgDecl, string, error) {
 	return allDecls, packageDoc, nil
 }
 
-func accumulateProdDecls(input *prodParseInput) ([]pkgDecl, string, error) {
+func accumulateProdDecls(input *prodParseInput) (decls []pkgDecl, doc string, err error) {
 	state := &prodAccumulateState{}
 
 	for i := range input.prod {
@@ -140,8 +140,8 @@ func accumulateOneProd(input *prodParseInput, state *prodAccumulateState, name s
 	return nil
 }
 
-func parseAndMergeProd(input *prodFileInput) ([]pkgDecl, string, error) {
-	decls, doc, err := parseOneProdFile(input)
+func parseAndMergeProd(input *prodFileInput) (decls []pkgDecl, doc string, err error) {
+	decls, doc, err = parseOneProdFile(input)
 	if err != nil {
 		return nil, emptyString, fmt.Errorf("parse prod file: %w", err)
 	}
@@ -149,7 +149,7 @@ func parseAndMergeProd(input *prodFileInput) ([]pkgDecl, string, error) {
 	return decls, mergePackageDoc(input.packageDoc, doc, input.name), nil
 }
 
-func parseOneProdFile(input *prodFileInput) ([]pkgDecl, string, error) {
+func parseOneProdFile(input *prodFileInput) (decls []pkgDecl, doc string, err error) {
 	path := filepath.Join(input.dir, input.name)
 
 	file, err := parser.ParseFile(input.fset, path, nil, parser.ParseComments)
@@ -208,7 +208,7 @@ func applyRefactor(pkg *packageInfo, scan *prodScanResult, opts runOptions) erro
 
 	deletes := planDeletes(scan.prodFiles, scan.testFiles, testFileName(pkg.Name))
 
-	err = commitWrites(pkg, writes, deletes, opts)
+	err = commitWrites(&commitInput{pkg: pkg, writes: writes, deletes: deletes, opts: opts})
 	if err != nil {
 		return fmt.Errorf(fmtCommitWrites, err)
 	}

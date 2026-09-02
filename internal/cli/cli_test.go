@@ -92,20 +92,18 @@ func TestRunEarlyErrorPaths(t *testing.T) {
 
 func TestRunPassesReusabilityWeights(t *testing.T) {
 	var got reusability.Weights
-	orig := analyzeFn
-	t.Cleanup(func() { analyzeFn = orig })
-	analyzeFn = func(_ context.Context, cfg *reusability.Config) (reusability.Report, error) {
+	analyze := func(_ context.Context, cfg *reusability.Config) (reusability.Report, error) {
 		got = cfg.ReusabilityWeights
 
 		return reusability.Report{}, nil
 	}
 
-	if code := execute([]string{
+	if code := executeWithAnalyze([]string{
 		"--reusability-weight-cohesion=0.1",
 		"--reusability-weight-coupling=0.2",
 		"--reusability-weight-testability=0.3",
 		"--reusability-weight-documentation=0.4",
-	}); code != 0 {
+	}, analyze); code != 0 {
 		t.Fatalf("exit = %d, want 0", code)
 	}
 
@@ -124,9 +122,7 @@ func TestRunCheckRequiresRules(t *testing.T) {
 }
 
 func TestRunCheckWithRules(t *testing.T) {
-	orig := analyzeFn
-	t.Cleanup(func() { analyzeFn = orig })
-	analyzeFn = func(_ context.Context, _ *reusability.Config) (reusability.Report, error) {
+	analyze := func(_ context.Context, _ *reusability.Config) (reusability.Report, error) {
 		return reusability.Report{Packages: []reusability.PackageReport{{
 			Path: "example.com/p",
 			Types: []reusability.TypeReport{{
@@ -138,15 +134,13 @@ func TestRunCheckWithRules(t *testing.T) {
 		}}}, nil
 	}
 
-	if code := execute([]string{"--check", `--rule=**:0.8`}); code != 3 {
+	if code := executeWithAnalyze([]string{"--check", `--rule=**:0.8`}, analyze); code != 3 {
 		t.Fatalf("policy violation exit = %d, want 3", code)
 	}
 }
 
 func TestRunCheckSpecificRuleOverridesBaseline(t *testing.T) {
-	orig := analyzeFn
-	t.Cleanup(func() { analyzeFn = orig })
-	analyzeFn = func(_ context.Context, _ *reusability.Config) (reusability.Report, error) {
+	passingAnalyze := func(_ context.Context, _ *reusability.Config) (reusability.Report, error) {
 		return reusability.Report{Packages: []reusability.PackageReport{{
 			Path: "example.com/internal/dto",
 			Types: []reusability.TypeReport{{Name: "T", Reusability: metrics.MetricResult{
@@ -156,11 +150,11 @@ func TestRunCheckSpecificRuleOverridesBaseline(t *testing.T) {
 	}
 
 	rules := []string{"--check", "--rule=**:0.6", "--rule=**/internal/dto:0.5"}
-	if code := execute(rules); code != 0 {
+	if code := executeWithAnalyze(rules, passingAnalyze); code != 0 {
 		t.Fatalf("specific override exit = %d, want 0", code)
 	}
 
-	analyzeFn = func(_ context.Context, _ *reusability.Config) (reusability.Report, error) {
+	failingAnalyze := func(_ context.Context, _ *reusability.Config) (reusability.Report, error) {
 		return reusability.Report{Packages: []reusability.PackageReport{{
 			Path: "example.com/internal/dto",
 			Types: []reusability.TypeReport{{Name: "T", Reusability: metrics.MetricResult{
@@ -168,15 +162,13 @@ func TestRunCheckSpecificRuleOverridesBaseline(t *testing.T) {
 			}}},
 		}}}, nil
 	}
-	if code := execute(rules); code != 3 {
+	if code := executeWithAnalyze(rules, failingAnalyze); code != 3 {
 		t.Fatalf("regression below override exit = %d, want 3", code)
 	}
 }
 
 func TestRunPolicySourceLogged(t *testing.T) {
-	orig := analyzeFn
-	t.Cleanup(func() { analyzeFn = orig })
-	analyzeFn = func(_ context.Context, _ *reusability.Config) (reusability.Report, error) {
+	analyze := func(_ context.Context, _ *reusability.Config) (reusability.Report, error) {
 		return reusability.Report{Packages: []reusability.PackageReport{{
 			Path: "p",
 			Types: []reusability.TypeReport{{
@@ -188,7 +180,7 @@ func TestRunPolicySourceLogged(t *testing.T) {
 		}}}, nil
 	}
 
-	if code := execute([]string{"--check", `--rule=**:0.7`}); code != 0 {
+	if code := executeWithAnalyze([]string{"--check", `--rule=**:0.7`}, analyze); code != 0 {
 		t.Fatalf("passing check exit = %d, want 0", code)
 	}
 }

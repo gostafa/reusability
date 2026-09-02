@@ -35,8 +35,13 @@ var (
 func (loader *Loader) Load(
 	ctx context.Context,
 	opts *outbound.FactOptions,
-) (string, []domain.PackageExtract, error) {
-	return loader.extract(ctx, opts)
+) (modulePath string, extracts []domain.PackageExtract, err error) {
+	modulePath, extracts, err = loader.extract(ctx, opts)
+	if err != nil {
+		return emptyString, nil, fmt.Errorf("loader extract: %w", err)
+	}
+
+	return modulePath, extracts, nil
 }
 
 // New returns a compiler-backed fact source.
@@ -45,8 +50,8 @@ func New() *Loader { return &Loader{extract: extractFacts} }
 func extractFacts(
 	ctx context.Context,
 	opts *outbound.FactOptions,
-) (string, []domain.PackageExtract, error) {
-	modulePath, extracts, err := load(ctx, opts, defaultLoaderDeps())
+) (modulePath string, extracts []domain.PackageExtract, err error) {
+	modulePath, extracts, err = load(ctx, opts, defaultLoaderDeps())
 	if err != nil {
 		return emptyString, nil, fmt.Errorf("goloader load: %w", err)
 	}
@@ -318,16 +323,16 @@ func lookupNamedType(scope *types.Scope, name string) (*types.TypeName, *types.N
 	return typeName, named, true
 }
 
-func extractType(ctx *extractCtx, tn *types.TypeName, named *types.Named) domain.TypeExtract {
-	out := baseTypeExtract(ctx, tn, named)
-	refs := newRefCollector(tn, ctx.analyzed)
+func extractType(ctx *extractCtx, typeName *types.TypeName, named *types.Named) domain.TypeExtract {
+	out := baseTypeExtract(ctx, typeName, named)
+	refs := newRefCollector(typeName, ctx.analyzed)
 	collected := structFields(named, refs)
 	fields, fieldIndex, fieldPositions := collected.fields, collected.fieldIndex, collected.positions
 
 	out.Fields = fields
 
 	docMethods := fillTypeMethods(&out, ctx, named, refs, fieldIndex)
-	attachTypeRefsDocs(&out, ctx, tn, refs, fieldPositions, docMethods)
+	attachTypeRefsDocs(&out, ctx, typeName, refs, fieldPositions, docMethods)
 
 	return out
 }
@@ -335,23 +340,27 @@ func extractType(ctx *extractCtx, tn *types.TypeName, named *types.Named) domain
 func attachTypeRefsDocs(
 	out *domain.TypeExtract,
 	ctx *extractCtx,
-	tn *types.TypeName,
+	typeName *types.TypeName,
 	refs *refCollector,
 	fieldPositions []token.Pos,
 	docMethods []methodDocInput,
 ) {
 	out.ReferencedTypeKeys = sortedRefKeys(refs.seen)
 	out.ExportedMembers, out.DocumentedExportedMembers = memberDocs(
-		ctx.idx, tn, out.Fields, fieldPositions, docMethods,
+		ctx.idx, typeName, out.Fields, fieldPositions, docMethods,
 	)
 }
 
-func baseTypeExtract(ctx *extractCtx, tn *types.TypeName, named *types.Named) domain.TypeExtract {
+func baseTypeExtract(
+	ctx *extractCtx,
+	typeName *types.TypeName,
+	named *types.Named,
+) domain.TypeExtract {
 	return domain.TypeExtract{
-		Name:     tn.Name(),
-		Exported: tn.Exported(),
+		Name:     typeName.Name(),
+		Exported: typeName.Exported(),
 		Kind:     typeKind(named),
-		Pos:      position(ctx.pkg.Fset, ctx.baseDir, tn.Pos()),
+		Pos:      position(ctx.pkg.Fset, ctx.baseDir, typeName.Pos()),
 	}
 }
 
@@ -364,10 +373,7 @@ func fillTypeMethods(
 ) []methodDocInput {
 	methods := sortedMethods(ctx, named)
 	methodIndex := indexMethodDecls(methods)
-
-	out.Methods = make([]domain.MethodFacts, zero, len(methods))
-
-	docs := make([]methodDocInput, zero, len(methods))
+	docs := initializeMethodFacts(out, methods)
 
 	for i := range methods {
 		facts, doc := methodFacts(ctx, methods[i], refs, fieldIndex, methodIndex, len(out.Fields))
@@ -377,6 +383,12 @@ func fillTypeMethods(
 	}
 
 	return docs
+}
+
+func initializeMethodFacts(out *domain.TypeExtract, methods []methodDecl) []methodDocInput {
+	out.Methods = make([]domain.MethodFacts, zero, len(methods))
+
+	return make([]methodDocInput, zero, len(methods))
 }
 
 func indexMethodDecls(methods []methodDecl) map[*types.Func]int {
@@ -533,7 +545,7 @@ func load(
 	ctx context.Context,
 	opts *outbound.FactOptions,
 	deps *loaderDeps,
-) (string, []domain.PackageExtract, error) {
+) (modulePath string, extracts []domain.PackageExtract, err error) {
 	// load.
 	pkgs, err := loadPackages(ctx, opts, deps)
 	if err != nil {
@@ -553,11 +565,11 @@ func extractLoaded(
 	opts *outbound.FactOptions,
 	deps *loaderDeps,
 	pkgs []*packages.Package,
-) (string, []domain.PackageExtract, error) {
+) (modulePath string, extracts []domain.PackageExtract, err error) {
 	// extractLoaded.
-	modulePath := mainModulePath(pkgs)
+	modulePath = mainModulePath(pkgs)
 
-	extracts, err := extractAll(
+	extracts, err = extractAll(
 		ctx,
 		&extractJob{pkgs: pkgs, opts: opts, modulePath: modulePath},
 		deps,
@@ -702,26 +714,29 @@ func findAnyModulePath(pkgs []*packages.Package) string {
 
 func memberDocs(
 	idx *syntaxIndex,
-	tn *types.TypeName,
+	typeName *types.TypeName,
 	fields []domain.FieldFacts,
 	fieldPositions []token.Pos,
 	methods []methodDocInput,
 ) (exported, documented int) {
-	exported, documented = countTypeDocs(idx.typeDocs, tn)
+	exported, documented = countTypeDocs(idx.typeDocs, typeName)
 	exported, documented = addFieldDocs(idx.fieldDocs, fields, fieldPositions, exported, documented)
 	exported, documented = addMethodDocs(methods, exported, documented)
 
 	return exported, documented
 }
 
-func countTypeDocs(typeDocs map[types.Object]bool, tn *types.TypeName) (exported, documented int) {
-	if !tn.Exported() {
+func countTypeDocs(
+	typeDocs map[types.Object]bool,
+	typeName *types.TypeName,
+) (exported, documented int) {
+	if !typeName.Exported() {
 		return zero, zero
 	}
 
 	exported = one
 
-	if typeDocs[tn] {
+	if typeDocs[typeName] {
 		documented = one
 	}
 
@@ -771,30 +786,34 @@ func addMethodDocs(methods []methodDocInput, exported, documented int) (exp, doc
 
 func methodFacts(
 	ctx *extractCtx,
-	m methodDecl,
+	method methodDecl,
 	refs *refCollector,
 	fieldIndex map[*types.Var]int,
 	methodIndex map[*types.Func]int,
 	fieldCount int,
 ) (domain.MethodFacts, methodDocInput) {
-	facts := domain.MethodFacts{
-		Name:     m.fn.Name(),
-		Exported: m.fn.Exported(),
-		Pos:      position(ctx.pkg.Fset, ctx.baseDir, m.decl.Pos()),
-		Lines:    lineCount(ctx.pkg.Fset, m.decl.Pos(), m.decl.End()),
-	}
+	facts := newMethodFacts(ctx, method)
 
-	if sig, ok := m.fn.Type().(*types.Signature); ok {
+	if sig, ok := method.fn.Type().(*types.Signature); ok {
 		refs.addType(sig)
 	}
 
 	walkBody(&walkBodyRequest{
-		info: ctx.pkg.TypesInfo, decl: m.decl, self: m.fn,
+		info: ctx.pkg.TypesInfo, decl: method.decl, self: method.fn,
 		fieldCount: fieldCount, fieldIndex: fieldIndex,
 		methodIndex: methodIndex, facts: &facts,
 	})
 
-	return facts, methodDocInput{exported: m.fn.Exported(), documented: m.decl.Doc != nil}
+	return facts, methodDocInput{exported: method.fn.Exported(), documented: method.decl.Doc != nil}
+}
+
+func newMethodFacts(ctx *extractCtx, method methodDecl) domain.MethodFacts {
+	return domain.MethodFacts{
+		Name:     method.fn.Name(),
+		Exported: method.fn.Exported(),
+		Pos:      position(ctx.pkg.Fset, ctx.baseDir, method.decl.Pos()),
+		Lines:    lineCount(ctx.pkg.Fset, method.decl.Pos(), method.decl.End()),
+	}
 }
 
 func newRefCollector(self *types.TypeName, analyzed map[string]bool) *refCollector {

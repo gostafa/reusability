@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 )
 
-func commitWrites(pkg *packageInfo, writes []writeOp, deletes []string, opts runOptions) error {
-	err := pickCommitErr(pkg, writes, deletes, opts)
+func commitWrites(input *commitInput) error {
+	err := pickCommitErr(input)
 	if err != nil {
 		return fmt.Errorf(fmtCommitWrites, err)
 	}
@@ -18,19 +18,16 @@ func commitWrites(pkg *packageInfo, writes []writeOp, deletes []string, opts run
 	return nil
 }
 
-func pickCommitErr(pkg *packageInfo, writes []writeOp, deletes []string, opts runOptions) error {
-	if opts.dryRun {
-		err := printDryRun(pkg, writes, deletes)
-		if err != nil {
-			return fmt.Errorf("commit runner: %w", err)
-		}
+func pickCommitErr(input *commitInput) error {
+	runner := commitDisk
 
-		return nil
+	if input.opts.dryRun {
+		runner = printDryRun
 	}
 
-	err := commitDisk(pkg, writes, deletes)
+	err := runner(input.pkg, input.writes, input.deletes)
 	if err != nil {
-		return fmt.Errorf("commit runner: %w", err)
+		return fmt.Errorf(errFmtCommitRunner, err)
 	}
 
 	return nil

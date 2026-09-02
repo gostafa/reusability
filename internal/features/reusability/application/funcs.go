@@ -31,5 +31,5 @@ func NewService(weights *metrics.ReusabilityWeights) (*Service, error) {
 // ComputeForType evaluates CBO and the reusability index for one type.
 // fieldUsage is "direct" or "transitive".
 func (svc *Service) ComputeForType(typeFacts *typefacts.TypeFacts, fieldUsage string) Result {
-	return domain.Compute(typeFacts, svc.weights, fieldUsage)
+	return domain.Compute(typeFacts, &svc.weights, fieldUsage)
 }
