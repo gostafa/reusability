@@ -59,8 +59,9 @@ func FormatViolations(violations []Violation) string {
 }
 
 // MatchPackage reports whether pattern matches importPath. * matches exactly
-// one path segment; ** matches zero or more segments. Matching is against
-// the full import path using / as the separator.
+// one path segment; ** matches zero or more segments. Matching is against the
+// full import path using / as the separator. When multiple rules match, the
+// evaluator selects the most specific pattern rather than the highest minimum.
 func MatchPackage(pattern, importPath string) bool {
 	return matchSegments(splitPattern(pattern), strings.Split(importPath, pathSep))
 }
@@ -101,7 +102,7 @@ func countReportTypes(report *reusability.Report) int {
 }
 
 func evaluatePackage(pkg *reusability.PackageReport, rules []Rule) []Violation {
-	threshold, pattern := strictestRule(pkg.Path, rules)
+	threshold, pattern := matchingRule(pkg.Path, rules)
 
 	if pattern == emptyString {
 		return nil
@@ -208,36 +209,54 @@ func splitPattern(pattern string) []string {
 	return strings.Split(pattern, pathSep)
 }
 
-func strictestRule(importPath string, rules []Rule) (threshold float64, pattern string) {
+func matchingRule(importPath string, rules []Rule) (threshold float64, pattern string) {
 	var matched bool
 
 	for index := range rules {
-		candidate := ruleCandidate{
-			importPath: importPath,
-			rule:       rules[index],
-			threshold:  threshold,
-			pattern:    pattern,
-			matched:    matched,
+		if !MatchPackage(rules[index].Pattern, importPath) {
+			continue
 		}
 
-		considerRule(&candidate)
-
-		threshold, pattern, matched = candidate.threshold, candidate.pattern, candidate.matched
+		if !matched || moreSpecific(rules[index].Pattern, pattern) {
+			threshold = rules[index].Min
+			pattern = rules[index].Pattern
+			matched = true
+		}
 	}
 
 	return threshold, pattern
 }
 
-func considerRule(candidate *ruleCandidate) {
-	if !MatchPackage(candidate.rule.Pattern, candidate.importPath) {
-		return
+func moreSpecific(candidate, current string) bool {
+	candidateLiteral, candidateWildcards, candidateSegments := patternSpecificity(candidate)
+	currentLiteral, currentWildcards, currentSegments := patternSpecificity(current)
+
+	if candidateLiteral != currentLiteral {
+		return candidateLiteral > currentLiteral
 	}
 
-	if !candidate.matched || candidate.rule.Min > candidate.threshold {
-		candidate.threshold = candidate.rule.Min
-		candidate.pattern = candidate.rule.Pattern
-		candidate.matched = true
+	if candidateWildcards != currentWildcards {
+		return candidateWildcards < currentWildcards
 	}
+
+	// A longer pattern is more constrained. Equality deliberately returns true
+	// so later rules override earlier rules with the same specificity.
+	return candidateSegments >= currentSegments
+}
+
+func patternSpecificity(pattern string) (literal, wildcards, segments int) {
+	for _, segment := range splitPattern(pattern) {
+		segments++
+		if segment == star || segment == doubleStar {
+			wildcards++
+
+			continue
+		}
+
+		literal++
+	}
+
+	return literal, wildcards, segments
 }
 
 func validateRule(key string, rule Rule) error {

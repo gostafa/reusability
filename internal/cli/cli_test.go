@@ -143,6 +143,36 @@ func TestRunCheckWithRules(t *testing.T) {
 	}
 }
 
+func TestRunCheckSpecificRuleOverridesBaseline(t *testing.T) {
+	orig := analyzeFn
+	t.Cleanup(func() { analyzeFn = orig })
+	analyzeFn = func(_ context.Context, _ *reusability.Config) (reusability.Report, error) {
+		return reusability.Report{Packages: []reusability.PackageReport{{
+			Path: "example.com/internal/dto",
+			Types: []reusability.TypeReport{{Name: "T", Reusability: metrics.MetricResult{
+				Name: metrics.MetricReusability, Applicable: true, Value: 0.5,
+			}}},
+		}}}, nil
+	}
+
+	rules := []string{"--check", "--rule=**:0.6", "--rule=**/internal/dto:0.5"}
+	if code := execute(rules); code != 0 {
+		t.Fatalf("specific override exit = %d, want 0", code)
+	}
+
+	analyzeFn = func(_ context.Context, _ *reusability.Config) (reusability.Report, error) {
+		return reusability.Report{Packages: []reusability.PackageReport{{
+			Path: "example.com/internal/dto",
+			Types: []reusability.TypeReport{{Name: "T", Reusability: metrics.MetricResult{
+				Name: metrics.MetricReusability, Applicable: true, Value: 0.49,
+			}}},
+		}}}, nil
+	}
+	if code := execute(rules); code != 3 {
+		t.Fatalf("regression below override exit = %d, want 3", code)
+	}
+}
+
 func TestRunPolicySourceLogged(t *testing.T) {
 	orig := analyzeFn
 	t.Cleanup(func() { analyzeFn = orig })

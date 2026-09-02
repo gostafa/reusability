@@ -11,18 +11,11 @@ linters:
         type: module
         description: Enforce Go type reusability policy thresholds
         settings:
-          patterns: [./...]
-          tests: false
-          generated: false
           dependency-scope: module
           field-usage: direct
-          reusability-weights:
-            cohesion: 0.35
-            coupling: 0.25
-            testability: 0.25
-            documentation: 0.15
           rules:
-            - pattern: "**/internal/**"
-              min: 0.8
             - pattern: "**"
-              min: 0.6
+              min: 0.60
+            # A more-specific package path overrides the baseline.
+            - pattern: "github.com/example/project/internal/dto"
+              min: 0.50

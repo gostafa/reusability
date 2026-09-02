@@ -22,6 +22,17 @@ func ptr(value float64) *float64 {
 	return &value
 }
 
+func TestNewDeclaresRunResultType(t *testing.T) {
+	created, err := New(&Settings{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if created.ResultType == nil || created.ResultType.String() != "*analyzer.runResult" {
+		t.Fatalf("ResultType = %v, want *analyzer.runResult", created.ResultType)
+	}
+}
+
 func TestRunnerRunReportsPackageAndTypeViolations(t *testing.T) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "p.go", "package p\n\ntype Widget struct{}\n", 0)

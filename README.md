@@ -38,8 +38,8 @@ reusability
 
 # Fail when policy rules are violated.
 # reusability --check \
-#   --rule='**/internal/**':0.8 \
 #   --rule='**':0.6 \
+#   --rule='github.com/example/project/internal/dto':0.5 \
 #   ./...
 ```
 
@@ -64,10 +64,16 @@ Policy gates type-level reusability by package import path. Example:
 
 ```bash
 reusability --check \
-  --rule='**/internal/**':0.8 \
   --rule='**':0.6 \
+  --rule='github.com/example/project/internal/dto':0.5 \
   ./...
 ```
+
+When multiple rules match, the most specific package pattern wins: patterns
+with more literal path segments take precedence, then patterns with fewer
+wildcards, then longer patterns. Exact ties use the later rule. This lets a
+narrow rule lower a DTO/config-heavy package's threshold without weakening the
+global baseline. Rules match package import paths, not file names.
 
 ### Build from source
 
@@ -114,10 +120,10 @@ linters:
           field-usage: direct
 
           rules:
-            - pattern: "**/internal/**"
-              min: 0.8
             - pattern: "**"
               min: 0.6
+            - pattern: "github.com/example/project/internal/dto"
+              min: 0.5
 ```
 
 Build and run the custom linter:

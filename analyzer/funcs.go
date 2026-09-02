@@ -12,6 +12,7 @@ import (
 	"go/ast"
 	"go/token"
 	"math"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -34,8 +35,9 @@ func New(settings *Settings) (*analysis.Analyzer, error) {
 	active := newRunner(&resolved)
 
 	return &analysis.Analyzer{
-		Name: Name,
-		Doc:  Doc,
+		Name:       Name,
+		Doc:        Doc,
+		ResultType: reflect.TypeFor[*runResult](),
 		Run: func(pass *analysis.Pass) (any, error) {
 			return active.run(pass)
 		},

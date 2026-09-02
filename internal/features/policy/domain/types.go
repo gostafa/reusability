@@ -17,7 +17,9 @@ type (
 		Threshold float64
 	}
 
-	// Rule is a package-path glob paired with a minimum reusability.
+	// Rule is a package-path glob paired with a minimum reusability. When more
+	// than one rule matches, the most specific pattern wins; exact ties use the
+	// later rule.
 	Rule struct {
 		// Pattern is a glob against the full import path; * matches one segment,
 		// ** matches zero or more segments, using / as the separator.
@@ -35,13 +37,5 @@ type (
 		pkgPath   string
 		pattern   string
 		threshold float64
-	}
-
-	ruleCandidate struct {
-		importPath string
-		pattern    string
-		rule       Rule
-		threshold  float64
-		matched    bool
 	}
 )

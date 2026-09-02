@@ -75,7 +75,7 @@ func TestMatchPackage(t *testing.T) {
 	}
 }
 
-func TestEvaluateStrictestRuleWins(t *testing.T) {
+func TestEvaluateMostSpecificRuleWins(t *testing.T) {
 	t.Parallel()
 
 	report := reusability.Report{Packages: []reusability.PackageReport{{
@@ -87,17 +87,59 @@ func TestEvaluateStrictestRuleWins(t *testing.T) {
 	}}}
 
 	rules := []Rule{
-		{Pattern: "**/internal/**", Min: 0.8},
 		{Pattern: "**", Min: 0.6},
+		{Pattern: "**/internal/**", Min: 0.5},
 	}
 
 	got := Evaluate(&report, rules)
-	if len(got) != 1 {
-		t.Fatalf("violations = %d, want 1: %+v", len(got), got)
+	if len(got) != 0 {
+		t.Fatalf("violations = %+v, want none", got)
+	}
+}
+
+func TestMoreSpecific(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		path     string
+		rules    []Rule
+		wantRule string
+		wantMin  float64
+	}{
+		{
+			name:     "literal segments beat wildcard baseline",
+			path:     "example.com/m/internal/store",
+			rules:    []Rule{{Pattern: "**", Min: 0.6}, {Pattern: "**/internal/**", Min: 0.5}},
+			wantRule: "**/internal/**", wantMin: 0.5,
+		},
+		{
+			name:     "fewer wildcards break equal literal count",
+			path:     "example.com/m/store",
+			rules:    []Rule{{Pattern: "example.com/*/store", Min: 0.6}, {Pattern: "example.com/m/store", Min: 0.5}},
+			wantRule: "example.com/m/store", wantMin: 0.5,
+		},
+		{
+			name:     "fewer wildcards beat longer patterns",
+			path:     "example.com/m/internal/store",
+			rules:    []Rule{{Pattern: "**/store", Min: 0.6}, {Pattern: "**/**/store", Min: 0.5}},
+			wantRule: "**/store", wantMin: 0.6,
+		},
+		{
+			name:     "later rule wins exact specificity tie",
+			path:     "example.com/m/store",
+			rules:    []Rule{{Pattern: "example.com/*/store", Min: 0.6}, {Pattern: "example.com/*/store", Min: 0.5}},
+			wantRule: "example.com/*/store", wantMin: 0.5,
+		},
 	}
 
-	if got[0].Threshold != 0.8 || got[0].Rule != "**/internal/**" {
-		t.Fatalf("violation = %+v, want threshold 0.8 from **/internal/**", got[0])
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotMin, gotRule := matchingRule(tc.path, tc.rules)
+			if gotRule != tc.wantRule || gotMin != tc.wantMin {
+				t.Fatalf("matchingRule() = (%v, %q), want (%v, %q)", gotMin, gotRule, tc.wantMin, tc.wantRule)
+			}
+		})
 	}
 }
 

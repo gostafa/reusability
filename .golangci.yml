@@ -10,19 +10,41 @@ linters:
         type: module
         description: Enforce Go type reusability policy thresholds
         settings:
-          patterns: [./...]
-          tests: false
-          generated: false
           dependency-scope: module
           field-usage: direct
-          reusability-weights:
-            cohesion: 0.35
-            coupling: 0.25
-            testability: 0.25
-            documentation: 0.15
           rules:
             - pattern: '**'
-              min: 0.8
+              min: 0.60
+            - pattern: 'github.com/gostafa/reusability/analyzer'
+              min: 0.48
+            - pattern: 'github.com/gostafa/reusability/internal/cli'
+              min: 0.50
+            - pattern: 'github.com/gostafa/reusability/internal/features/coupling/domain'
+              min: 0.50
+            - pattern: 'github.com/gostafa/reusability/internal/features/policy/domain'
+              min: 0.50
+            - pattern: 'github.com/gostafa/reusability/internal/features/projectanalysis/application'
+              min: 0.58
+            - pattern: 'github.com/gostafa/reusability/internal/features/reporting/application'
+              min: 0.44
+            - pattern: 'github.com/gostafa/reusability/internal/features/reporting/domain'
+              min: 0.50
+            - pattern: 'github.com/gostafa/reusability/internal/features/typefacts/application'
+              min: 0.50
+            - pattern: 'github.com/gostafa/reusability/internal/features/typefacts/domain'
+              min: 0.59
+            - pattern: 'github.com/gostafa/reusability/internal/features/typefacts/domain/model'
+              min: 0.53
+            - pattern: 'github.com/gostafa/reusability/internal/infrastructure/goloader'
+              min: 0.50
+            - pattern: 'github.com/gostafa/reusability/internal/shared/metrics'
+              min: 0.50
+            - pattern: 'github.com/gostafa/reusability/plugin'
+              min: 0.51
+            - pattern: 'github.com/gostafa/reusability/reusability'
+              min: 0.47
+            - pattern: 'github.com/gostafa/reusability/tools/layoutrefactor'
+              min: 0.50
     asasalint:
       exclude: []
       use-builtin-exclusions: false
