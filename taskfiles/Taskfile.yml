@@ -16,6 +16,30 @@ vars:
         gobin="${gopath:-$HOME/go}/bin"
       fi
       printf '%s' "$gobin"
+  ACTIONLINT_EXTRA_ARGS: ""
+  ACTIONLINT_NIX_INSTALLABLE: nixpkgs#actionlint
+  ACTIONLINT_TARGETS: ""
+  ADRS_EXTRA_ARGS: ""
+  ADRS_NIX_INSTALLABLE: nixpkgs#adrs
+  GOLANGCI_LINT_FMT_FORMATTER_FLAGS: >-
+    -E gci -E gofmt -E gofumpt -E goimports -E golines -E swaggo
+  GOLANGCI_LINT_NIX_INSTALLABLE: nixpkgs#go nixpkgs#golangci-lint
+  GOVULNCHECK_NIX_INSTALLABLE: nixpkgs#go nixpkgs#govulncheck
+  GO_COVER_PROFILE: ""
+  GO_FUZZTIME: ""
+  GO_JUNIT_REPORT: ""
+  GO_JUNIT_REPORT_NIX_INSTALLABLE: nixpkgs#go nixpkgs#go-junit-report
+  GO_NIX_INSTALLABLE: nixpkgs#go
+  YAMLFIX_EXTRA_ARGS: ""
+  YAMLFIX_NIX_INSTALLABLE: nixpkgs#yamlfix
+  YAMLFIX_TARGETS: "."
+  YAMLLINT_CONFIG: ""
+  YAMLLINT_EXTRA_ARGS: ""
+  YAMLLINT_NIX_INSTALLABLE: nixpkgs#yamllint
+  YAMLLINT_TARGETS: "."
+  ZIZMOR_EXTRA_ARGS: "--offline"
+  ZIZMOR_NIX_INSTALLABLE: nixpkgs#zizmor
+  ZIZMOR_TARGETS: ".github"
 includes:
   go:
     taskfile: go/Taskfile.yml
@@ -37,27 +61,24 @@ includes:
       # the merged copy keep resolving. Overwritten on every run, never deleted.
       GO_INTERNAL_SKIP_CONFIG: ".golangci-taskotter-skip.yml"
       GO_COVER_PROFILE: ""
-      GO_FUZZTIME: ""
+      GO_FUZZTIME: '{{.GO_FUZZTIME}}'
       # Formatter selection shared by every golangci-lint fmt invocation (both the
       # skip-pattern and plain paths, on Unix and Windows). Kept in one place so the
       # four call sites cannot drift apart.
       GO_FMT_FORMATTER_FLAGS: >-
         -E gci -E gofmt -E gofumpt -E goimports -E golines -E swaggo
       GLOBAL_GO_BIN: '{{.GLOBAL_GO_BIN}}'
-  staticcheck:
-    taskfile: staticcheck/Taskfile.yml
-    vars:
-      STATICCHECK_LINT_SKIP_PATTERN: ""
-      STATICCHECK_VERSION: "2026.1"
-      STATICCHECK_RELEASE_BASE_URL: https://github.com/dominikh/go-tools/releases/download
-      GLOBAL_GO_BIN: '{{.GLOBAL_GO_BIN}}'
+      GO_NIX_INSTALLABLE: '{{.GO_NIX_INSTALLABLE}}'
+    dir: ..
   actionlint:
     taskfile: actionlint/Taskfile.yml
     vars:
       ACTIONLINT_LINT_SKIP_PATTERN: ""
       ACTIONLINT_VERSION: "1.7.12"
-      ACTIONLINT_EXTRA_ARGS: ""
-      ACTIONLINT_TARGETS: ""
+      ACTIONLINT_EXTRA_ARGS: '{{.ACTIONLINT_EXTRA_ARGS}}'
+      ACTIONLINT_TARGETS: '{{.ACTIONLINT_TARGETS}}'
+      ACTIONLINT_NIX_INSTALLABLE: '{{.ACTIONLINT_NIX_INSTALLABLE}}'
+    dir: ..
   yamllint:
     taskfile: yamllint/Taskfile.yml
     vars:
@@ -68,66 +89,107 @@ includes:
       EXTRA_ARGS: '{{.EXTRA_ARGS}}'
       YAMLLINT_VERSION: ""
       YAMLFIX_VERSION: ""
+      YAMLLINT_NIX_INSTALLABLE: '{{.YAMLLINT_NIX_INSTALLABLE}}'
+      YAMLLINT_TARGETS: '{{.YAMLLINT_TARGETS}}'
+      YAMLLINT_CONFIG: '{{.YAMLLINT_CONFIG}}'
+      YAMLLINT_EXTRA_ARGS: '{{.YAMLLINT_EXTRA_ARGS}}'
+    dir: ..
   zizmor:
     taskfile: zizmor/Taskfile.yml
     vars:
       ZIZMOR_LINT_SKIP_PATTERN: ""
-      ZIZMOR_EXTRA_ARGS: "--offline"
-      ZIZMOR_TARGETS: ".github"
+      ZIZMOR_EXTRA_ARGS: '{{.ZIZMOR_EXTRA_ARGS}}'
+      ZIZMOR_TARGETS: '{{.ZIZMOR_TARGETS}}'
       ZIZMOR_VERSION: "1.25.2"
+      ZIZMOR_NIX_INSTALLABLE: '{{.ZIZMOR_NIX_INSTALLABLE}}'
+    dir: ..
   adrs:
     taskfile: adrs/Taskfile.yml
     vars:
       CARGO_BIN_UNIX: "$HOME/.cargo/bin"
       EXTRA_ARGS: '{{.EXTRA_ARGS}}'
       ADRS_VERSION: ""
+      ADRS_NIX_INSTALLABLE: '{{.ADRS_NIX_INSTALLABLE}}'
+      ADRS_EXTRA_ARGS: '{{.ADRS_EXTRA_ARGS}}'
+    dir: ..
+  go-junit-report:
+    taskfile: go-junit-report/Taskfile.yml
+    dir: ..
+    vars:
+      GO_JUNIT_REPORT_NIX_INSTALLABLE: '{{.GO_JUNIT_REPORT_NIX_INSTALLABLE}}'
+      GO_JUNIT_REPORT: '{{.GO_JUNIT_REPORT}}'
+      GO_COVER_PROFILE: '{{.GO_COVER_PROFILE}}'
+  golangci-lint:
+    taskfile: golangci-lint/Taskfile.yml
+    dir: ..
+    vars:
+      GOLANGCI_LINT_NIX_INSTALLABLE: '{{.GOLANGCI_LINT_NIX_INSTALLABLE}}'
+      # Formatter selection shared by every golangci-lint fmt invocation on Unix and
+
+      # Windows. Kept in one place so the two call sites cannot drift apart.
+      GOLANGCI_LINT_FMT_FORMATTER_FLAGS: '{{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS}}'
+  govulncheck:
+    taskfile: govulncheck/Taskfile.yml
+    dir: ..
+    vars:
+      GOVULNCHECK_NIX_INSTALLABLE: '{{.GOVULNCHECK_NIX_INSTALLABLE}}'
+  yamlfix:
+    taskfile: yamlfix/Taskfile.yml
+    dir: ..
+    vars:
+      YAMLFIX_NIX_INSTALLABLE: '{{.YAMLFIX_NIX_INSTALLABLE}}'
+      YAMLFIX_TARGETS: '{{.YAMLFIX_TARGETS}}'
+      YAMLFIX_EXTRA_ARGS: '{{.YAMLFIX_EXTRA_ARGS}}'
 tasks:
+  ci:
+    desc: Run ci for synced TaskOtter modules
+    cmds:
+      - task: golangci-lint:ci
+      - task: govulncheck:ci
+      - task: yamllint:ci
+      - task: actionlint:ci
+      - task: zizmor:ci
+  ci:fix:
+    desc: Run ci:fix for synced TaskOtter modules
+    cmds:
+      - task: golangci-lint:ci:fix
+      - task: yamlfix:ci:fix
   install:
     desc: Run install for synced TaskOtter modules
     cmds:
       - task: go:install
-      - task: staticcheck:install
-      - task: actionlint:install
+      - task: go-junit-report:install
+      - task: golangci-lint:install
+      - task: govulncheck:install
       - task: yamllint:install
+      - task: yamlfix:install
+      - task: actionlint:install
       - task: zizmor:install
       - task: adrs:install
-  install:undo:
-    desc: Run install:undo for synced TaskOtter modules
+  test:
+    desc: Run test for synced TaskOtter modules
     cmds:
-      - task: go:install:undo
-      - task: staticcheck:install:undo
-      - task: actionlint:install:undo
-      - task: yamllint:install:undo
-      - task: zizmor:install:undo
-      - task: adrs:install:undo
-  lint:
-    desc: Run lint for synced TaskOtter modules
+      - task: go:test
+      - task: go-junit-report:test
+  verify:
+    desc: Run verify for synced TaskOtter modules
     cmds:
-      - task: go:lint
-      - task: staticcheck:lint
-      - task: actionlint:lint
-      - task: yamllint:lint
-      - task: zizmor:lint
-  lint:fix:
-    desc: Run lint:fix for synced TaskOtter modules
-    cmds:
-      - task: go:lint:fix
-      - task: yamllint:lint:fix
-  upgrade:
-    desc: Run upgrade for synced TaskOtter modules
-    cmds:
-      - task: go:upgrade
-      - task: staticcheck:upgrade
-      - task: actionlint:upgrade
-      - task: yamllint:upgrade
-      - task: zizmor:upgrade
-      - task: adrs:upgrade
+      - task: go:verify
+      - task: go-junit-report:verify
   version:
     desc: Run version for synced TaskOtter modules
     cmds:
       - task: go:version
-      - task: staticcheck:version
-      - task: actionlint:version
+      - task: go-junit-report:version
+      - task: golangci-lint:version
+      - task: govulncheck:version
       - task: yamllint:version
+      - task: yamlfix:version
+      - task: actionlint:version
       - task: zizmor:version
       - task: adrs:version
+  which:
+    desc: Run which for synced TaskOtter modules
+    cmds:
+      - task: go:which
+      - task: go-junit-report:which

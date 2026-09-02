@@ -1,18 +1,22 @@
 ---
 version: "3.5"
+
 output:
   group:
     begin: "::group::{{.TASK}}"
     end: "::endgroup::"
     error_only: false
+
 silent: true
+
 includes:
-  cargo:
-    taskfile: ../cargo/Taskfile.yml
+  nix:
+    taskfile: ../nix/Taskfile.yml
+
 vars:
-  CARGO_BIN_UNIX: "$HOME/.cargo/bin"
-  EXTRA_ARGS: ""
-  ADRS_VERSION: ""
+  ADRS_NIX_INSTALLABLE: nixpkgs#adrs
+  ADRS_EXTRA_ARGS: ""
+
 tasks:
   default:
     run: once
@@ -20,184 +24,156 @@ tasks:
     summary: Display the list of available adrs-related tasks defined in this Taskfile.
     cmds:
       - task --list
+
   install:
     run: once
-    desc: Install adrs on the current operating system
+    desc: Install adrs via the Nix profile
     summary: |
-      Install adrs with cargo install for the current platform.
-      Pass ADRS_VERSION to pin a specific release instead of the latest.
-      Bootstraps the Rust toolchain via the cargo module if cargo is not
-      already present.
-    deps:
-      - cargo:install
+      Install adrs into the user Nix profile when it is not already
+      available on PATH. Override the ADRS_NIX_INSTALLABLE
+      variable to pin a different package or version.
+    status:
+      - command -v adrs >/dev/null 2>&1
     cmds:
-      - task: _install:unix
-      - task: _install:windows
-  install:undo:
+      - task: nix:install:profile
+        vars:
+          NIX_INSTALLABLE: "{{.ADRS_NIX_INSTALLABLE}}"
+
+  version:
     run: once
-    desc: Remove adrs from the current operating system
-    summary: Remove the adrs binary previously installed with cargo install.
-    prompt:
-      - This will remove adrs from this machine.
-      - Continue?
-    cmds:
-      - task: _install:undo:unix
-      - task: _install:undo:windows
-  upgrade:
-    run: once
-    desc: Upgrade adrs to the requested version
+    desc: Show the active adrs version
     summary: |
-      Reinstall adrs with cargo install --force. Leave ADRS_VERSION empty to
-      upgrade to the latest release, or set an exact version.
+      Print the version reported by the adrs binary resolved from PATH.
+      Auto-installs adrs if missing.
     deps:
-      - cargo:install
+      - task: install
     cmds:
-      - task: _install:unix
-        vars:
-          FORCE: "true"
-      - task: _install:windows
-        vars:
-          FORCE: "true"
+      - task: _version:unix
+      - task: _version:windows
+
   init:
     run: once
-    desc: Initialize an ADR repository (EXTRA_ARGS=flags)
+    desc: Initialize an ADR repository (ADRS_EXTRA_ARGS=flags)
     summary: |
       Run adrs init to set up an Architecture Decision Record repository in
-      the current directory. Pass EXTRA_ARGS or arguments after -- for flags
+      the current directory. Pass ADRS_EXTRA_ARGS or arguments after -- for flags
       such as a custom directory. Auto-installs adrs if missing.
     dir: "{{.USER_WORKING_DIR}}"
     deps:
-      - install
+      - task: install
     cmds:
       - cmd: >-
-          bin="$(command -v adrs || echo "{{.CARGO_BIN_UNIX}}/adrs")"; "$bin" init {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}} {{- else}}{{.EXTRA_ARGS}}{{end}}{{end}}
+          bash -lc '{{.NIX_LOAD}};
+          adrs init
+          {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}}'
         platforms: [linux, darwin]
       - cmd: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$b = (Get-Command adrs -ErrorAction SilentlyContinue).Source; if (-not $b) { $b = Join-Path $env:USERPROFILE '.cargo\bin\adrs.exe' }; & $b init {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}} {{- else}}{{.EXTRA_ARGS}}{{end}}{{end}}"
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "adrs init {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}}"
         platforms: [windows]
+
   new:
     run: once
-    desc: Create a new ADR (EXTRA_ARGS="title" or -- "title")
+    desc: Create a new ADR (ADRS_EXTRA_ARGS="title" or -- "title")
     summary: |
       Run adrs new to create a new Architecture Decision Record. Pass the
-      title via EXTRA_ARGS or after --. Auto-installs adrs if missing.
+      title via ADRS_EXTRA_ARGS or after --. Auto-installs adrs if missing.
     dir: "{{.USER_WORKING_DIR}}"
     deps:
-      - install
+      - task: install
     cmds:
       - cmd: >-
-          bin="$(command -v adrs || echo "{{.CARGO_BIN_UNIX}}/adrs")"; "$bin" new {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}} {{- else}}{{.EXTRA_ARGS}}{{end}}{{end}}
+          bash -lc '{{.NIX_LOAD}};
+          adrs new
+          {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}}'
         platforms: [linux, darwin]
       - cmd: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$b = (Get-Command adrs -ErrorAction SilentlyContinue).Source; if (-not $b) { $b = Join-Path $env:USERPROFILE '.cargo\bin\adrs.exe' }; & $b new {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}} {{- else}}{{.EXTRA_ARGS}}{{end}}{{end}}"
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "adrs new {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}}"
         platforms: [windows]
+
   list:
     run: once
-    desc: List all ADRs in the repository (EXTRA_ARGS=flags)
+    desc: List all ADRs in the repository (ADRS_EXTRA_ARGS=flags)
     summary: |
       Run adrs list to show the Architecture Decision Records in the current
-      repository. Pass EXTRA_ARGS or arguments after -- for flags.
+      repository. Pass ADRS_EXTRA_ARGS or arguments after -- for flags.
       Auto-installs adrs if missing.
     dir: "{{.USER_WORKING_DIR}}"
     deps:
-      - install
+      - task: install
     cmds:
       - cmd: >-
-          bin="$(command -v adrs || echo "{{.CARGO_BIN_UNIX}}/adrs")"; "$bin" list {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}} {{- else}}{{.EXTRA_ARGS}}{{end}}{{end}}
+          bash -lc '{{.NIX_LOAD}};
+          adrs list
+          {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}}'
         platforms: [linux, darwin]
       - cmd: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$b = (Get-Command adrs -ErrorAction SilentlyContinue).Source; if (-not $b) { $b = Join-Path $env:USERPROFILE '.cargo\bin\adrs.exe' }; & $b list {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}} {{- else}}{{.EXTRA_ARGS}}{{end}}{{end}}"
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "adrs list {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}}"
         platforms: [windows]
+
   generate:
     run: once
-    desc: Generate ADR docs (EXTRA_ARGS="toc|graph|book")
+    desc: Generate ADR docs (ADRS_EXTRA_ARGS="toc|graph|book")
     summary: |
       Run adrs generate to build ADR documentation such as a table of
-      contents, a graph, or a book. Pass the generator name via EXTRA_ARGS or
+      contents, a graph, or a book. Pass the generator name via ADRS_EXTRA_ARGS or
       after --. Auto-installs adrs if missing.
     dir: "{{.USER_WORKING_DIR}}"
     deps:
-      - install
+      - task: install
     cmds:
       - cmd: >-
-          bin="$(command -v adrs || echo "{{.CARGO_BIN_UNIX}}/adrs")"; "$bin" generate {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}} {{- else}}{{.EXTRA_ARGS}}{{end}}{{end}}
+          bash -lc '{{.NIX_LOAD}};
+          adrs generate
+          {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}}'
         platforms: [linux, darwin]
       - cmd: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$b = (Get-Command adrs -ErrorAction SilentlyContinue).Source; if (-not $b) { $b = Join-Path $env:USERPROFILE '.cargo\bin\adrs.exe' }; & $b generate {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}} {{- else}}{{.EXTRA_ARGS}}{{end}}{{end}}"
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "adrs generate {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}}"
         platforms: [windows]
+
   exec:
     run: once
-    desc: Run any adrs subcommand (EXTRA_ARGS or -- args)
+    desc: Run any adrs subcommand (ADRS_EXTRA_ARGS or -- args)
     summary: |
       Run an arbitrary adrs subcommand. Pass the subcommand and its arguments
-      via EXTRA_ARGS or after --. Auto-installs adrs if missing.
+      via ADRS_EXTRA_ARGS or after --. Auto-installs adrs if missing.
     dir: "{{.USER_WORKING_DIR}}"
     deps:
-      - install
+      - task: install
     cmds:
       - cmd: >-
-          bin="$(command -v adrs || echo "{{.CARGO_BIN_UNIX}}/adrs")"; "$bin" {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}} {{- else}}{{.EXTRA_ARGS}}{{end}}{{end}}
+          bash -lc '{{.NIX_LOAD}};
+          adrs
+          {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}}'
         platforms: [linux, darwin]
       - cmd: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$b = (Get-Command adrs -ErrorAction SilentlyContinue).Source; if (-not $b) { $b = Join-Path $env:USERPROFILE '.cargo\bin\adrs.exe' }; & $b {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}} {{- else}}{{.EXTRA_ARGS}}{{end}}{{end}}"
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "adrs {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}}"
         platforms: [windows]
-  version:
-    run: once
-    desc: Show the installed adrs version
-    summary: Print the active adrs version via adrs --version. Auto-installs adrs if missing.
-    deps:
-      - install
-    cmds:
-      - cmd: >-
-          bin="$(command -v adrs || echo "{{.CARGO_BIN_UNIX}}/adrs")"; "$bin" --version
-        platforms: [linux, darwin]
-      - cmd: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$b = (Get-Command adrs -ErrorAction SilentlyContinue).Source; if (-not $b) { $b = Join-Path $env:USERPROFILE '.cargo\bin\adrs.exe' }; & $b --version"
-        platforms: [windows]
-  _install:unix:
+
+  _version:unix:
     run: once
     internal: true
+    desc: Show adrs version on macOS or Linux
+    summary: Print the adrs version on macOS or Linux.
     platforms: [linux, darwin]
-    set: [errexit, nounset, pipefail]
-    status:
-      - '[ "{{default "false" .FORCE}}" != "true" ]'
-      - test -x "$(command -v adrs || echo "{{.CARGO_BIN_UNIX}}/adrs")"
-      - >-
-        [ -z "{{.ADRS_VERSION}}" ] || "$(command -v adrs || echo "{{.CARGO_BIN_UNIX}}/adrs")" --version | grep -Fq "{{.ADRS_VERSION}}"
     cmds:
-      - echo 'Installing adrs via cargo...'
-      - >-
-        cargo="$(command -v cargo || echo "{{.CARGO_BIN_UNIX}}/cargo")"; "$cargo" install {{if eq (default "false" .FORCE) "true"}}--force{{end}} adrs{{if .ADRS_VERSION}} --version {{.ADRS_VERSION}}{{end}}
-      - echo 'adrs installed.'
-  _install:windows:
+      - bash -lc '{{.NIX_LOAD}}; adrs --version'
+
+  _version:windows:
     run: once
     internal: true
+    desc: Show adrs version on Windows
+    summary: Print the adrs version on Windows.
     platforms: [windows]
-    status:
-      - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "if ('{{default "false" .FORCE}}' -eq 'true') { exit 1 }; $b = (Get-Command adrs -ErrorAction SilentlyContinue).Source; if (-not $b) { $b = Join-Path $env:USERPROFILE '.cargo\bin\adrs.exe' }; if (-not (Test-Path $b)) { exit 1 }; $requested = '{{.ADRS_VERSION}}'; if ([string]::IsNullOrWhiteSpace($requested) -or ((& $b --version) -like ('*' + $requested + '*'))) { exit 0 }; exit 1"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "if (Get-Command adrs -ErrorAction SilentlyContinue) {
+          exit 0 } else { exit 1 }"
+        msg: adrs is not installed or not available in PATH.
     cmds:
-      - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "$c = (Get-Command cargo -ErrorAction SilentlyContinue).Source; if (-not $c) { $c = Join-Path $env:USERPROFILE '.cargo\bin\cargo.exe' }; & $c install {{if eq (default "false" .FORCE) "true"}}--force{{end}} adrs{{if .ADRS_VERSION}} --version {{.ADRS_VERSION}}{{end}}"
-  _install:undo:unix:
-    run: once
-    internal: true
-    platforms: [linux, darwin]
-    set: [errexit, nounset, pipefail]
-    status:
-      - >-
-        ! command -v adrs >/dev/null 2>&1 && ! test -x "{{.CARGO_BIN_UNIX}}/adrs"
-    cmds:
-      - >-
-        cargo="$(command -v cargo || echo "{{.CARGO_BIN_UNIX}}/cargo")"; "$cargo" uninstall adrs
-      - echo 'adrs removed.'
-  _install:undo:windows:
-    run: once
-    internal: true
-    platforms: [windows]
-    status:
-      - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "$b = (Get-Command adrs -ErrorAction SilentlyContinue).Source; if (-not $b) { $b = Join-Path $env:USERPROFILE '.cargo\bin\adrs.exe' }; if (Test-Path $b) { exit 1 } else { exit 0 }"
-    cmds:
-      - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "$c = (Get-Command cargo -ErrorAction SilentlyContinue).Source; if (-not $c) { $c = Join-Path $env:USERPROFILE '.cargo\bin\cargo.exe' }; & $c uninstall adrs"
+      - adrs --version
