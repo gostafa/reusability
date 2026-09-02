@@ -1,32 +1,41 @@
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package main
 
 import (
-	"os"
 	"testing"
 )
 
+const (
+	testZero    = 0
+	testOne     = 1
+	testSeven   = 7
+	flagVersion = "--version"
+)
+
 func TestMainDelegatesToCLI(t *testing.T) {
-	originalArgs, originalRun, originalExit := os.Args, run, exit
-	t.Cleanup(func() {
-		os.Args, run, exit = originalArgs, originalRun, originalExit
-	})
+	var (
+		gotArgs []string
+		gotCode int
+	)
 
-	os.Args = []string{"reusability", "--version"}
-	var gotArgs []string
-	var gotCode int
-	run = func(args []string) int {
-		gotArgs = append([]string(nil), args...)
+	runtime := mainRuntime{
+		run: func(args []string) int {
+			gotArgs = append([]string(nil), args...)
 
-		return 7
+			return testSeven
+		},
+		exit: func(code int) { gotCode = code },
 	}
-	exit = func(code int) { gotCode = code }
 
-	main()
+	runtime.start([]string{flagVersion})
 
-	if len(gotArgs) != 1 || gotArgs[0] != "--version" {
+	if len(gotArgs) != testOne || gotArgs[testZero] != flagVersion {
 		t.Fatalf("args = %v", gotArgs)
 	}
-	if gotCode != 7 {
-		t.Fatalf("exit code = %d, want 7", gotCode)
+
+	if gotCode != testSeven {
+		t.Fatalf("exit code = %d, want %d", gotCode, testSeven)
 	}
 }

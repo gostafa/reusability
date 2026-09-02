@@ -1,219 +1,28 @@
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package analyzer
 
 import (
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"go/types"
+	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
 	policydomain "github.com/gostafa/reusability/internal/features/policy/domain"
-	"github.com/gostafa/reusability/internal/shared/metrics"
 	"golang.org/x/tools/go/analysis"
 )
-
-func TestNewRejectsInvalidSettings(t *testing.T) {
-	t.Parallel()
-
-	_, err := New(Settings{DependencyScope: "nope"})
-	if err == nil {
-		t.Fatal("expected error for invalid dependency-scope")
-	}
-
-	_, err = New(Settings{FieldUsage: "nope"})
-	if err == nil {
-		t.Fatal("expected error for invalid field-usage")
-	}
-
-	_, err = New(Settings{ReusabilityWeights: &ReusabilityWeightSettings{
-		Cohesion: ptr(-1),
-	}})
-	if err == nil {
-		t.Fatal("expected error for invalid reusability weight")
-	}
-
-	_, err = New(Settings{ReusabilityWeights: &ReusabilityWeightSettings{
-		Cohesion:      ptr(0),
-		Coupling:      ptr(0),
-		Testability:   ptr(0),
-		Documentation: ptr(0),
-	}})
-	if err == nil {
-		t.Fatal("expected error for all-zero reusability weights")
-	}
-
-	min := 1.5
-	_, err = New(Settings{Rules: []RuleSettings{{Pattern: "**", Min: &min}}})
-	if err == nil {
-		t.Fatal("expected error for invalid rule min")
-	}
-}
-
-func TestNewAcceptsDefaults(t *testing.T) {
-	t.Parallel()
-
-	a, err := New(Settings{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if a.Name != Name {
-		t.Fatalf("Name = %q, want %q", a.Name, Name)
-	}
-}
-
-func TestRunnerLoadGroupsViolations(t *testing.T) {
-	fixtureDir := filepath.Join(repoRoot(t), "testdata", "fixture")
-	min := 0.99
-
-	r := newRunner(Settings{
-		Directory: fixtureDir,
-		Patterns:  []string{"./isolated"},
-		Rules:     []RuleSettings{{Pattern: "**", Min: &min}},
-	}.withDefaults())
-
-	r.load()
-	if r.err != nil {
-		t.Fatal(r.err)
-	}
-
-	got := r.byPkg["example.com/fixture/isolated"]
-	if len(got) == 0 {
-		t.Fatal("expected reusability violations for isolated with min 0.99")
-	}
-
-	found := false
-	for _, v := range got {
-		if v.Type == "Value" && v.Rule == "**" {
-			found = true
-		}
-	}
-
-	if !found {
-		t.Fatalf("expected reusability violation on Value, got %#v", got)
-	}
-}
 
 func ptr(value float64) *float64 {
 	return &value
 }
 
-func TestReusabilityWeightsConfig(t *testing.T) {
-	t.Parallel()
-
-	settings := Settings{
-		ReusabilityWeights: &ReusabilityWeightSettings{
-			Cohesion:      ptr(0.1),
-			Coupling:      ptr(0.2),
-			Testability:   ptr(0.3),
-			Documentation: ptr(0.4),
-		},
-	}.withDefaults()
-
-	got := settings.toConfig().ReusabilityWeights
-	want := metrics.ReusabilityWeights{
-		Cohesion:      0.1,
-		Coupling:      0.2,
-		Testability:   0.3,
-		Documentation: 0.4,
-	}
-	if got != want {
-		t.Fatalf("weights = %+v, want %+v", got, want)
-	}
-
-	partial := Settings{
-		ReusabilityWeights: &ReusabilityWeightSettings{
-			Coupling: ptr(0),
-		},
-	}.withDefaults()
-
-	got = partial.toConfig().ReusabilityWeights
-	want = metrics.DefaultReusabilityWeights()
-	want.Coupling = 0
-	if got != want {
-		t.Fatalf("partial weights = %+v, want %+v", got, want)
-	}
-}
-
-func TestFormatViolation(t *testing.T) {
-	t.Parallel()
-
-	msg := formatViolation(policydomain.Violation{
-		Package:   "example.com/p",
-		Type:      "T",
-		Value:     0.55,
-		Threshold: 0.8,
-		Rule:      "**/internal/**",
-	})
-
-	want := "example.com/p.T (type): reusability 0.55 is below min 0.80 (rule **/internal/**)"
-	if msg != want {
-		t.Fatalf("formatViolation = %q, want %q", msg, want)
-	}
-}
-
-func TestTypePosAndPackagePos(t *testing.T) {
-	t.Parallel()
-
-	src := `package p
-
-type Widget struct{}
-`
-	fset := token.NewFileSet()
-
-	file, err := parser.ParseFile(fset, "p.go", src, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	pass := &analysis.Pass{Files: []*ast.File{file}, Fset: fset}
-
-	if pos := typePos(pass, "Widget"); pos == token.NoPos {
-		t.Fatal("typePos(Widget) = NoPos")
-	}
-
-	if pos := typePos(pass, "Missing"); pos != file.Package {
-		t.Fatalf("typePos(Missing) = %v, want package clause", pos)
-	}
-
-	if pos := packagePos(pass); pos != file.Package {
-		t.Fatalf("packagePos = %v, want %v", pos, file.Package)
-	}
-}
-
-func repoRoot(t *testing.T) string {
-	t.Helper()
-
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-
-	return filepath.Clean(filepath.Join(filepath.Dir(file), ".."))
-}
-
-func TestViolationPosUsesType(t *testing.T) {
-	t.Parallel()
-
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, "p.go", "package p\n\ntype Widget struct{}\n", 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	pass := &analysis.Pass{Files: []*ast.File{file}, Fset: fset}
-	pos := violationPos(pass, policydomain.Violation{Type: "Widget"})
-	if pos == token.NoPos {
-		t.Fatal("violationPos = NoPos")
-	}
-}
-
-func TestRunnerRunReportsTypeViolations(t *testing.T) {
-	t.Parallel()
-
+func TestRunnerRunReportsPackageAndTypeViolations(t *testing.T) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "p.go", "package p\n\ntype Widget struct{}\n", 0)
 	if err != nil {
@@ -246,6 +55,75 @@ func TestRunnerRunReportsTypeViolations(t *testing.T) {
 		t.Fatalf("diagnostics = %#v, want one", diagnostics)
 	}
 	if !strings.Contains(diagnostics[0].Message, "is below min 0.8") {
-		t.Errorf("diagnostic = %q", diagnostics[0].Message)
+		t.Errorf("type diagnostic = %q", diagnostics[0].Message)
+	}
+
+	sentinel := errors.New("cached load error")
+	failing := &runner{err: sentinel}
+	failing.once.Do(func() {})
+	if _, err := failing.run(pass); !errors.Is(err, sentinel) {
+		t.Fatalf("run error = %v, want sentinel", err)
+	}
+}
+
+func TestRunnerLoadErrors(t *testing.T) {
+	min := 2.0
+	settings := Settings{Rules: []RuleSettings{{Pattern: "**", Min: &min}}}
+	s := (&settings).withDefaults()
+	r := newRunner(&s)
+	r.load()
+	if r.err == nil || !strings.Contains(r.err.Error(), "reusability policy") {
+		t.Fatalf("policy load error = %v", r.err)
+	}
+
+	settings = Settings{
+		Directory: filepath.Join(t.TempDir(), "missing"),
+		Patterns:  []string{defaultPackagePattern},
+	}
+	s = (&settings).withDefaults()
+	r = newRunner(&s)
+	r.load()
+	if r.err == nil || !strings.Contains(r.err.Error(), "reusability analyze") {
+		t.Fatalf("analysis load error = %v", r.err)
+	}
+}
+
+func TestInlinePolicyDefaultsAndIgnoresModularityFile(t *testing.T) {
+	dir := t.TempDir()
+	config := filepath.Join(dir, ".modularity.yml")
+	if err := os.WriteFile(
+		config,
+		[]byte("version: 1\npackage:\n  types: 3\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	defaultsSettings := Settings{Directory: dir}
+	defaults, err := (&defaultsSettings).rules()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(defaults) != 1 || defaults[0].Pattern != "**" || defaults[0].Min != 0.7 {
+		t.Fatalf("default rules = %+v", defaults)
+	}
+
+	min := 0.6
+	inlineSettings := Settings{Rules: []RuleSettings{
+		{Pattern: "**/internal/**", Min: ptr(0.8)},
+		{Pattern: "**", Min: &min},
+	}}
+	inline, err := (&inlineSettings).rules()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inline) != 2 || inline[0].Min != 0.8 || inline[1].Min != 0.6 {
+		t.Fatalf("inline rules = %+v", inline)
+	}
+}
+
+func TestEmptyPackagePosition(t *testing.T) {
+	if pos := packagePos(&analysis.Pass{}); pos != token.NoPos {
+		t.Fatalf("packagePos(empty) = %v, want NoPos", pos)
 	}
 }

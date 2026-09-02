@@ -1,5 +1,5 @@
-// Package workerpool runs indexed tasks on a bounded number of goroutines.
-//
-// Tasks write to their own result slots so callers can merge results
-// deterministically after Run returns.
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
+// Package workerpool provides reusable analysis utilities.
 package workerpool

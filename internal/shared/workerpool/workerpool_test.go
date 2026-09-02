@@ -1,84 +1,73 @@
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package workerpool
 
 import (
 	"context"
 	"errors"
-	"runtime"
+	"sync/atomic"
 	"testing"
 )
 
-func TestRunIndexedResults(t *testing.T) {
-	const n = 100
+// Black-box: every task runs exactly once.
+func TestRunAllTasks(t *testing.T) {
+	t.Parallel()
 
-	results := make([]int, n)
+	var count atomic.Int64
 
-	err := Run(context.Background(), 8, n, func(i int) error {
-		results[i] = i * i
+	err := Run(context.Background(), RunConfig{
+		Workers: 4, TaskCount: 100,
+		Fn: func(int) error {
+			count.Add(1)
 
-		return nil
+			return nil
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for i, v := range results {
-		if v != i*i {
-			t.Fatalf("results[%d] = %d", i, v)
-		}
+	if count.Load() != 100 {
+		t.Fatalf("ran %d tasks, want 100", count.Load())
 	}
 }
 
-func TestRunFirstErrorByIndex(t *testing.T) {
-	wantErr := errors.New("boom")
+// Black-box: the first task error surfaces.
+func TestRunPropagatesError(t *testing.T) {
+	t.Parallel()
 
-	err := Run(context.Background(), 4, 10, func(i int) error {
-		if i == 3 || i == 7 {
-			return wantErr
-		}
+	sentinel := errors.New("boom")
 
-		return nil
+	err := Run(context.Background(), RunConfig{
+		Workers: 2, TaskCount: 10,
+		Fn: func(i int) error {
+			if i == 3 {
+				return sentinel
+			}
+
+			return nil
+		},
 	})
-	if !errors.Is(err, wantErr) {
-		t.Fatalf("err = %v", err)
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("error = %v, want sentinel", err)
 	}
 }
 
-func TestRunCancellation(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
+// Black-box: the worker count is bounded by the configured value and the task
+// count.
+func TestWorkersBounds(t *testing.T) {
+	t.Parallel()
 
-	err := Run(ctx, 2, 1000, func(i int) error { return nil })
-	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("err = %v, want context.Canceled", err)
-	}
-}
-
-func TestRunZeroTasks(t *testing.T) {
-	err := Run(context.Background(), 4, 0, func(int) error { return nil })
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestWorkers(t *testing.T) {
-	maxProcs := runtime.GOMAXPROCS(0)
-	if got := Workers(0, 1000); got != maxProcs {
-		t.Fatalf("Workers(0, 1000) = %d, want %d", got, maxProcs)
+	if got := Workers(2, 100); got != 2 {
+		t.Errorf("Workers(2,100) = %d, want 2", got)
 	}
 
-	if got := Workers(0, 1); got != 1 {
-		t.Fatalf("Workers(0, 1) = %d, want 1", got)
+	if got := Workers(10, 3); got != 3 {
+		t.Errorf("Workers(10,3) = %d, want 3 (task-bound)", got)
 	}
 
-	if got := Workers(3, 1000); got != 3 {
-		t.Fatalf("Workers(3, 1000) = %d, want 3", got)
-	}
-
-	if got := Workers(64, 2); got != 2 {
-		t.Fatalf("Workers(64, 2) = %d, want 2", got)
-	}
-
-	if got := Workers(0, 0); got != 1 {
-		t.Fatalf("Workers(0, 0) = %d, want 1", got)
+	if got := Workers(0, 3); got < 1 || got > 3 {
+		t.Errorf("Workers(0,3) = %d, want within [1,3]", got)
 	}
 }

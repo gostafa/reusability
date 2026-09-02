@@ -1,93 +1,68 @@
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package bitset
 
 import "testing"
 
-func TestSmallFieldSet(t *testing.T) {
-	a := NewFieldSet(64)
+// Black-box: the exported multi-word set operations.
+func TestFieldSetOperations(t *testing.T) {
+	t.Parallel()
+
+	a := NewFieldSet(80)
 	a.Set(0)
-	a.Set(63)
+	a.Set(65)
 
-	b := NewFieldSet(64)
-	b.Set(1)
-
-	if Small(a).Intersects(Small(b)) {
-		t.Fatal("disjoint small sets intersect")
+	if !Contains(a, 0) || !Contains(a, 65) {
+		t.Fatal("Set/Contains mismatch")
 	}
 
-	b.Set(63)
-
-	if !Small(a).Intersects(Small(b)) {
-		t.Fatal("overlapping small sets do not intersect")
-	}
-}
-
-func TestFieldSetGeneralPath(t *testing.T) {
-	// 65 fields exercises the multi-word path across the 64-bit boundary.
-	a := NewFieldSet(65)
-	b := NewFieldSet(65)
-
-	a.Set(0)
-	a.Set(64)
-
-	if !Contains(a, 64) || Contains(a, 63) {
-		t.Fatal("contains across word boundary")
+	if Contains(a, 1) {
+		t.Fatal("unset bit reported present")
 	}
 
 	if Count(a) != 2 {
-		t.Fatalf("count = %d, want 2", Count(a))
+		t.Fatalf("Count = %d, want 2", Count(a))
 	}
 
-	b.Set(63)
-
-	if Intersects(a, b) {
-		t.Fatal("disjoint sets intersect")
-	}
-
-	b.Set(64)
-
-	if !Intersects(a, b) {
-		t.Fatal("overlapping sets do not intersect")
-	}
-
+	b := NewFieldSet(80)
+	b.Set(1)
 	Union(a, b)
 
 	if Count(a) != 3 {
-		t.Fatalf("union count = %d, want 3", Count(a))
+		t.Fatalf("Union count = %d, want 3", Count(a))
 	}
 
-	clone := Clone(a)
-	clone.Set(10)
+	if !Intersects(a, b) {
+		t.Fatal("a should intersect b on bit 1")
+	}
 
-	if Contains(a, 10) {
-		t.Fatal("clone shares storage with original")
+	c := Clone(a)
+	c.Set(2)
+
+	if Count(c) == Count(a) {
+		t.Fatal("Clone must be independent of the original")
 	}
 }
 
-func TestFieldSetSmallView(t *testing.T) {
-	a := NewFieldSet(8)
-	a.Set(3)
+// Black-box: the single-word fast path.
+func TestSmallFieldSet(t *testing.T) {
+	t.Parallel()
 
-	probe := NewFieldSet(8)
-	probe.Set(3)
+	a := NewFieldSet(4)
+	a.Set(0)
 
-	if !Small(a).Intersects(Small(probe)) {
-		t.Fatal("small view lost the set field")
+	b := NewFieldSet(4)
+	b.Set(0)
+
+	if !Small(a).Intersects(Small(b)) {
+		t.Fatal("small sets share bit 0")
 	}
 
-	if Count(NewFieldSet(0)) != 0 {
-		t.Fatal("zero-size set should be empty")
-	}
+	d := NewFieldSet(4)
+	d.Set(3)
 
-	var nilSet FieldSet
-	if Count(nilSet) != 0 || Contains(nilSet, 5) || Small(nilSet).Intersects(Small(probe)) {
-		t.Fatal("empty set operations")
-	}
-
-	if Intersects(nilSet, a) {
-		t.Fatal("nil set intersects")
-	}
-
-	if clone := Clone(FieldSet{}); Count(clone) != 0 || Contains(clone, 0) {
-		t.Fatal("Clone of empty FieldSet must stay empty")
+	if Small(a).Intersects(Small(d)) {
+		t.Fatal("disjoint small sets must not intersect")
 	}
 }

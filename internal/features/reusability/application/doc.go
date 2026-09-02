@@ -1,5 +1,5 @@
-// Package application coordinates the reusability metric feature.
-//
-// It validates component weights once per run, then combines type facts with
-// upstream LCOM, AMC, and CBO results into the type-level reusability index.
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
+// Package application provides reusable analysis utilities.
 package application

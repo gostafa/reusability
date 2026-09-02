@@ -1,5 +1,5 @@
-// Package domain defines the source facts extracted from Go packages.
-//
-// The facts are plain data used as the input vocabulary for every metric
-// feature, without exposing compiler objects upstream.
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
+// Package domain provides reusable analysis utilities.
 package domain

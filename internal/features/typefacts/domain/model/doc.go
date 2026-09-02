@@ -1,5 +1,5 @@
-// Package model holds the pure type-fact structs consumed by metric features.
-//
-// These types describe fields, methods, positions, and branch counts without
-// exposing go/types or other compiler objects to upstream packages.
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
+// Package model provides reusable analysis utilities.
 package model

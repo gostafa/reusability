@@ -1,22 +1,47 @@
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package analyzer
 
 import (
+	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/gostafa/reusability/internal/features/projectanalysis/ports/inbound"
+	"github.com/gostafa/reusability/internal/shared/metrics"
 )
 
-// White-box: the composition root wires up an analyzer satisfying the port.
-func TestNewAnalyzerImplementsPort(t *testing.T) {
+// Black-box: the wired analyzer runs the real pipeline over the fixture module
+// end to end (compiler load → facts → metrics).
+func TestAnalyzeFixture(t *testing.T) {
 	t.Parallel()
 
-	requireAnalyzer(t, NewAnalyzer())
-}
+	result, err := NewAnalyzer().Analyze(context.Background(), &inbound.Options{
+		Directory:       filepath.Join("..", "..", "..", "testdata", "fixture"),
+		Patterns:        []string{"./..."},
+		DependencyScope: "module",
+		Weights:         metrics.DefaultReusabilityWeights(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-func requireAnalyzer(t *testing.T, a inbound.Analyzer) {
-	t.Helper()
+	if result.ModulePath != "example.com/fixture" {
+		t.Fatalf("module = %q", result.ModulePath)
+	}
 
-	if a == nil {
-		t.Fatal("NewAnalyzer returned nil")
+	if len(result.Packages) < 7 {
+		t.Fatalf("packages = %d, want >= 7", len(result.Packages))
+	}
+
+	for i := 1; i < len(result.Packages); i++ {
+		if result.Packages[i-1].Path > result.Packages[i].Path {
+			t.Fatalf(
+				"packages not sorted: %s before %s",
+				result.Packages[i-1].Path,
+				result.Packages[i].Path,
+			)
+		}
 	}
 }

@@ -1,63 +1,82 @@
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package sinks
 
 import (
-	"bufio"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/gostafa/reusability/internal/features/reporting/ports/outbound"
 )
 
-// White-box: stdoutStream.Close flushes buffered output (without closing the
-// underlying descriptor, which the process owns).
-func TestStdoutStreamCloseFlushes(t *testing.T) {
+// Black-box: FileSink round-trips a report body through the port.
+func TestFileSinkRoundTrip(t *testing.T) {
 	t.Parallel()
+	path := filepath.Join(t.TempDir(), "report.json")
 
-	f, err := os.CreateTemp(t.TempDir(), "stream")
+	sink := outbound.NewSink(FileSink{Path: path}.Open)
+
+	stream, err := sink.Open()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	defer func() { _ = f.Close() }()
-
-	s := stdoutStream{bufio.NewWriter(f)}
-	if _, err := s.Write([]byte("buffered")); err != nil {
+	if _, err := io.WriteString(stream, `{"ok":true}`); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := s.Close(); err != nil {
+	if err := stream.Close(); err != nil {
 		t.Fatal(err)
 	}
 
-	data, _ := os.ReadFile(f.Name())
-	if string(data) != "buffered" {
-		t.Fatalf("Close did not flush: %q", data)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(data) != `{"ok":true}` {
+		t.Fatalf("round-trip = %q", data)
 	}
 }
 
-// White-box: FileSink.Open creates and truncates the destination file.
-func TestFileSinkOpenTruncates(t *testing.T) {
-	t.Parallel()
+// Black-box: StdoutSink writes to standard output (redirected here to a pipe).
+func TestStdoutSinkWritesToStdout(t *testing.T) {
+	orig := os.Stdout
 
-	path := filepath.Join(t.TempDir(), "out.txt")
-	if err := os.WriteFile(path, []byte("stale, longer content"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	w, err := FileSink{Path: path}.Open()
+	reader, writer, err := os.Pipe()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := w.Write([]byte("new")); err != nil {
+	os.Stdout = writer
+	defer func() { os.Stdout = orig }()
+
+	stream, err := StdoutSink{}.Open()
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := w.Close(); err != nil {
+	if _, err := io.WriteString(stream, "hello stdout"); err != nil {
 		t.Fatal(err)
 	}
 
-	data, _ := os.ReadFile(path)
-	if string(data) != "new" {
-		t.Fatalf("file not truncated: %q", data)
+	if err := stream.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(data) != "hello stdout" {
+		t.Fatalf("stdout captured = %q", data)
 	}
 }

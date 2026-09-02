@@ -1,5 +1,5 @@
-// Package domain models the reusability feature's component calculations.
-//
-// It derives index components from source facts and upstream metric results,
-// computes type-level CBO, and keeps feature dependencies decoupled.
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
+// Package domain provides reusable analysis utilities.
 package domain

@@ -1,6 +1,5 @@
-// Package sinks provides reporting sink adapters for stdout and files.
-//
-// Both adapters implement the reporting outbound Sink port used by the
-// reporting application layer to write a rendered report without owning format
-// logic.
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
+// Package sinks provides reusable analysis utilities.
 package sinks

@@ -1,5 +1,5 @@
-// Package application runs the project analysis pipeline.
-//
-// It collects type facts, executes metric features with bounded concurrency,
-// and assembles deterministic analysis results.
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
+// Package application provides reusable analysis utilities.
 package application

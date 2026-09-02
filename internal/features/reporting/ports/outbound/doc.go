@@ -1,5 +1,5 @@
-// Package outbound declares the reporting outbound port.
-//
-// Sink is the contract the reporting application layer uses to open a writable
-// destination for a rendered report (stdout, file, or other adapter).
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
+// Package outbound defines report output sinks.
 package outbound

@@ -1,5 +1,5 @@
-// Package goloader adapts the Go compiler toolchain into type facts.
-//
-// It is the infrastructure boundary that imports go/packages, go/types, and
-// go/ast, producing extracted facts instead of metric results.
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
+// Package goloader loads Go packages and extracts type facts for analysis.
 package goloader

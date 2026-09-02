@@ -1,5 +1,5 @@
-// Package domain contains the complexity feature's metric formulas.
-//
-// It derives cyclomatic complexity from branch facts produced by the compiler
-// adapter, keeping the formula separate from AST extraction.
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
+// Package domain provides reusable analysis utilities.
 package domain

@@ -1,5 +1,5 @@
-// Package domain models the architecture feature's package dependency graph.
-//
-// It derives per-package coupling counts used by Abstractness, Instability, and
-// Distance from the Main Sequence.
+// Gostafa 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
+// Package domain provides reusable analysis utilities.
 package domain
