@@ -110,10 +110,6 @@ linters:
       reusability:
         type: module
         settings:
-          patterns:
-            - ./...
-          tests: false
-          generated: false
           dependency-scope: module
           field-usage: direct
 

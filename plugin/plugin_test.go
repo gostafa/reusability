@@ -30,13 +30,6 @@ func defaultPluginSettings() map[string]any {
 	return map[string]any{
 		"dependency-scope": "module",
 		"field-usage":      "direct",
-		"patterns":         []any{"./..."},
-		"reusability-weights": map[string]any{
-			"cohesion":      extWeightCohesion,
-			"coupling":      extWeightCoupling,
-			"testability":   extWeightTestability,
-			"documentation": extWeightDocumentation,
-		},
 		"rules": []any{
 			map[string]any{rulePatternKey: extInternalWildcard, "min": extInternalRuleMin},
 			map[string]any{rulePatternKey: extWildcardPattern, "min": extDefaultRuleMin},
@@ -80,6 +73,25 @@ func TestNewNilSettings(t *testing.T) {
 	t.Parallel()
 
 	p, err := New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if p.settings.Patterns != nil || p.settings.Tests || p.settings.Generated || p.settings.ReusabilityWeights != nil {
+		t.Fatalf("nil settings = %+v", p.settings)
+	}
+	if _, err := p.BuildAnalyzers(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestNewMinimalSettingsUsesAnalyzerDefaults(t *testing.T) {
+	t.Parallel()
+
+	p, err := New(map[string]any{
+		"dependency-scope": "module",
+		"field-usage":      "direct",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

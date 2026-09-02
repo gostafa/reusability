@@ -98,7 +98,7 @@ func DefaultReusabilityWeights() ReusabilityWeights {
 	return ReusabilityWeights{
 		Cohesion:      defaultWeightCohesion,
 		Coupling:      defaultWeightCoupling,
-		Testability:   defaultWeightCoupling,
+		Testability:   defaultWeightTest,
 		Documentation: defaultWeightDocs,
 	}
 }

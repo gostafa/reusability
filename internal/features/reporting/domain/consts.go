@@ -49,8 +49,8 @@ const (
 		`D = \\frac{\\text{documented exported members}}{\\text{exported members}}`
 
 	howCalculatedReusability = "Four normalized 0–1 components combine with weights " +
-		"w_c = 0.35 (cohesion C, from LCOM), w_k = 0.25 (coupling K, from CBO, " +
-		"contributing 1 − K), w_t = 0.25 (testability T, from average method " +
+		"w_c = 0.30 (cohesion C, from LCOM), w_k = 0.35 (coupling K, from CBO, " +
+		"contributing 1 − K), w_t = 0.20 (testability T, from average method " +
 		"complexity), and w_d = 0.15 (documentation D) by default. CLI weight " +
 		"flags or golangci-lint reusability-weights settings can override them. " +
 		"A component whose input is not applicable is dropped and the remaining " +
@@ -72,7 +72,7 @@ const (
 		"for example a type with no methods, no fields, and no exported members."
 
 	exampleReusability = "C = 0.8, 1 − K = 0.75, T = 0.5, D = 1.0 with default " +
-		"weights: RI = 0.35·0.8 + 0.25·0.75 + 0.25·0.5 + 0.15·1.0 ≈ 0.74."
+		"weights: RI = 0.30·0.8 + 0.35·0.75 + 0.20·0.5 + 0.15·1.0 ≈ 0.75."
 
 	// FormatText renders a human-readable report.
 	FormatText Format = "text"

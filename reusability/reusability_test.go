@@ -129,7 +129,7 @@ func TestAnalyzeOrderType(t *testing.T) {
 		t.Fatalf("order type name = %q, want Order", order.Name)
 	}
 
-	wantRI := 0.35*(1.0/3) + 0.25*0.5 + 0.25*0.6 + 0.15*(2.0/3)
+	wantRI := 0.30*(1.0/3) + 0.35*0.5 + 0.20*0.6 + 0.15*(2.0/3)
 	wantValue(t, order.Reusability, wantRI)
 
 	if order.Reusability.Name != metrics.MetricReusability {
