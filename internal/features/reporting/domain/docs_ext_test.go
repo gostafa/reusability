@@ -8,8 +8,8 @@ import (
 	"github.com/gostafa/reusability/internal/shared/metrics"
 )
 
-// Black-box: every reported metric and structural column has a complete
-// guide entry, with no duplicate names.
+// Black-box: every reported metric has a complete guide entry, with no
+// duplicate names.
 func TestMetricDocsCoverEveryMetric(t *testing.T) {
 	t.Parallel()
 
@@ -26,29 +26,6 @@ func TestMetricDocsCoverEveryMetric(t *testing.T) {
 
 	for _, name := range metrics.ReportedMetricOrder() {
 		assertMetricDoc(t, byName, name, domain.DocScopeType)
-	}
-
-	for _, name := range []string{"ca", "ce", "funcs", "vars", "consts", "types", "fields", "methods"} {
-		d, ok := byName[name]
-		if !ok {
-			t.Errorf("structural column %q has no docs entry", name)
-
-			continue
-		}
-
-		if d.Scope != domain.DocScopeStructural {
-			t.Errorf("%s scope = %q, want %q", name, d.Scope, domain.DocScopeStructural)
-		}
-
-		if d.Label == "" || d.FullName == "" || d.Summary == "" ||
-			d.HowCalculated == "" || d.Interpretation == "" || d.Example == "" {
-			t.Errorf("structural entry %q has empty prose fields", name)
-		}
-
-		// Structural columns are counted, not computed: no formula, no id.
-		if d.FormulaMathML != "" || d.Definition != "" {
-			t.Errorf("structural entry %q must not carry a formula or definition", name)
-		}
 	}
 }
 

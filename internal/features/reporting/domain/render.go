@@ -113,12 +113,9 @@ type treeNode struct {
 // treeSummary holds the computed statistics for one node's complete subtree.
 // Keeping it separate leaves treeNode responsible only for tree topology.
 type treeSummary struct {
-	pkgsTotal   int
-	typesTotal  int // types in the subtree, applicable or not
-	funcsTotal  int
-	varsTotal   int
-	constsTotal int
-	typeAgg     map[string]*columnStats // subtree type metrics
+	pkgsTotal  int
+	typesTotal int // types in the subtree, applicable or not
+	typeAgg    map[string]*columnStats // subtree type metrics
 }
 
 func (n *treeNode) child(name string) *treeNode {
@@ -143,9 +140,6 @@ func aggregateTree(n *treeNode, summaries map[*treeNode]*treeSummary) *treeSumma
 	if n.pkg != nil {
 		summary.pkgsTotal = 1
 		summary.typesTotal = len(n.pkg.Types)
-		summary.funcsTotal = n.pkg.ExportedFuncs + n.pkg.UnexportedFuncs
-		summary.varsTotal = n.pkg.Vars
-		summary.constsTotal = n.pkg.Consts
 		collectPackageStats(n.pkg, summary.typeAgg)
 	}
 
@@ -153,9 +147,6 @@ func aggregateTree(n *treeNode, summaries map[*treeNode]*treeSummary) *treeSumma
 		childSummary := aggregateTree(c, summaries)
 		summary.pkgsTotal += childSummary.pkgsTotal
 		summary.typesTotal += childSummary.typesTotal
-		summary.funcsTotal += childSummary.funcsTotal
-		summary.varsTotal += childSummary.varsTotal
-		summary.constsTotal += childSummary.constsTotal
 		mergeStats(summary.typeAgg, childSummary.typeAgg)
 	}
 
@@ -166,10 +157,9 @@ func aggregateTree(n *treeNode, summaries map[*treeNode]*treeSummary) *treeSumma
 // the aggregation map.
 func collectPackageStats(pkg *reusability.PackageReport, typeAgg map[string]*columnStats) {
 	for i := range pkg.Types {
-		for _, r := range pkg.Types[i].Metrics {
-			if r.Applicable {
-				addStat(typeAgg, r.Name, r.Value)
-			}
+		r := pkg.Types[i].Reusability
+		if r.Applicable {
+			addStat(typeAgg, metrics.MetricReusability, r.Value)
 		}
 	}
 }
@@ -299,9 +289,6 @@ func Text(report reusability.Report, opts TextOptions) string {
 	header := make([]tableCell, 0, 1+len(table.typeCols))
 
 	header = append(header, tableCell{text: "PATH / TYPE", style: ansiDim})
-	for _, name := range structuralPackageColumns() {
-		header = append(header, tableCell{text: name, style: ansiDim})
-	}
 	for _, name := range table.typeCols {
 		header = append(header, tableCell{text: abbrev(name), style: ansiDim})
 	}
@@ -327,7 +314,7 @@ func Text(report reusability.Report, opts TextOptions) string {
 	// Global column widths keep every branch aligned as one table.
 	sawNA := false
 
-	widths := make([]int, 1+len(structuralPackageColumns())+len(table.typeCols))
+	widths := make([]int, 1+len(table.typeCols))
 	for _, row := range table.rows {
 		for c, cell := range row {
 			widths[c] = max(widths[c], cell.width())
@@ -459,36 +446,11 @@ func childIndent(prefix, connector string) string {
 // nodeRow appends the spanning row of one package or directory node: its
 // structural counts followed by the means over all types in its subtree.
 func (t *textTable) nodeRow(node *treeNode, summary *treeSummary, label string) {
-	row := make([]tableCell, 0, 1+len(structuralPackageColumns())+len(t.typeCols))
+	row := make([]tableCell, 0, 1+len(t.typeCols))
 	row = append(row, tableCell{prefix: label, text: node.name, style: ansiBold})
-	row = append(row, structuralPackageCells(node, summary)...)
 	row = append(row, nodeTypeAggCells(summary, t.typeCols)...)
 
 	t.rows = append(t.rows, row)
-}
-
-func structuralPackageColumns() []string {
-	return []string{"Funcs", "Vars", "Consts", "Types"}
-}
-
-func structuralPackageCells(node *treeNode, summary *treeSummary) []tableCell {
-	funcs := summary.funcsTotal
-	vars := summary.varsTotal
-	consts := summary.constsTotal
-	types := summary.typesTotal
-	if node.pkg != nil && len(node.children) == 0 {
-		funcs = node.pkg.ExportedFuncs + node.pkg.UnexportedFuncs
-		vars = node.pkg.Vars
-		consts = node.pkg.Consts
-		types = len(node.pkg.Types)
-	}
-
-	return []tableCell{
-		{text: strconv.Itoa(funcs), style: ansiBold},
-		{text: strconv.Itoa(vars), style: ansiBold},
-		{text: strconv.Itoa(consts), style: ansiBold},
-		{text: strconv.Itoa(types), style: ansiBold},
-	}
 }
 
 // nodeTypeAggCells renders a node's type columns as the means over all types
@@ -519,31 +481,29 @@ func (t *textTable) typeRow(
 	prefix, connector string,
 ) {
 	typ := &node.pkg.Types[index]
-	byName := metricsByName(typ.Metrics)
 
-	row := make([]tableCell, 0, 1+len(structuralPackageColumns())+len(t.typeCols))
+	row := make([]tableCell, 0, 1+len(t.typeCols))
 	row = append(row, tableCell{prefix: prefix + connector, text: typ.Name})
-
-	for range structuralPackageColumns() {
-		row = append(row, tableCell{})
-	}
-
-	row = append(row, typeMetricCells(byName, t.typeCols, summary.typeAgg)...)
+	row = append(row, reusabilityCell(typ.Reusability, t.typeCols, summary.typeAgg)...)
 
 	t.rows = append(t.rows, row)
 }
 
-// typeMetricCells renders one type's metric columns, coloring each applicable
-// value against the subtree's column range and marking the rest n/a.
-func typeMetricCells(
-	byName map[string]metrics.MetricResult,
+// reusabilityCell renders the reusability column for one type.
+func reusabilityCell(
+	r metrics.MetricResult,
 	typeCols []string,
 	stats map[string]*columnStats,
 ) []tableCell {
 	cells := make([]tableCell, 0, len(typeCols))
 	for _, name := range typeCols {
-		r, ok := byName[name]
-		if !ok || !r.Applicable {
+		if name != metrics.MetricReusability {
+			cells = append(cells, naTableCell())
+
+			continue
+		}
+
+		if !r.Applicable {
 			cells = append(cells, naTableCell())
 
 			continue
@@ -556,16 +516,6 @@ func typeMetricCells(
 	}
 
 	return cells
-}
-
-// metricsByName indexes metric results by their metric name.
-func metricsByName(results []metrics.MetricResult) map[string]metrics.MetricResult {
-	byName := make(map[string]metrics.MetricResult, len(results))
-	for _, r := range results {
-		byName[r.Name] = r
-	}
-
-	return byName
 }
 
 // meanCell renders one aggregated column: the mean of the applicable
@@ -595,27 +545,15 @@ type columnStats struct {
 }
 
 // reportColumns lists the type-level metrics present anywhere in the
-// report, in the fixed metric order.
+// report. Schema v6 reports reusability only.
 func reportColumns(report reusability.Report) []string {
-	present := make(map[string]bool)
-
 	for i := range report.Packages {
-		for j := range report.Packages[i].Types {
-			for _, r := range report.Packages[i].Types[j].Metrics {
-				present[r.Name] = true
-			}
+		if len(report.Packages[i].Types) > 0 {
+			return []string{metrics.MetricReusability}
 		}
 	}
 
-	var cols []string
-
-	for _, name := range metrics.TypeMetricOrder() {
-		if present[name] {
-			cols = append(cols, name)
-		}
-	}
-
-	return cols
+	return nil
 }
 
 // writeNotes appends the notes section: per package, the reasons dropped
@@ -656,43 +594,40 @@ func writeNotes(b *strings.Builder, report reusability.Report, color bool) {
 // one line per metric, listing the affected types — otherwise packages
 // full of method-less types bury the table under repeated boilerplate.
 func packageNotes(pkg *reusability.PackageReport) []string {
+	type entry struct {
+		reason string
+		types  []string
+	}
+
+	var entries []entry
+
+	index := make(map[string]int)
+
+	for i := range pkg.Types {
+		r := pkg.Types[i].Reusability
+		if r.Reason == "" {
+			continue
+		}
+
+		j, ok := index[r.Reason]
+		if !ok {
+			j = len(entries)
+			index[r.Reason] = j
+			entries = append(entries, entry{reason: r.Reason})
+		}
+
+		entries[j].types = append(entries[j].types, pkg.Types[i].Name)
+	}
+
 	var notes []string
 
-	for _, name := range metrics.TypeMetricOrder() {
-		type entry struct {
-			reason string
-			types  []string
+	for _, e := range entries {
+		who := strings.Join(e.types, ", ")
+		if len(e.types) == len(pkg.Types) && len(pkg.Types) > 1 {
+			who = "all types"
 		}
 
-		var entries []entry
-
-		index := make(map[string]int)
-
-		for i := range pkg.Types {
-			for _, r := range pkg.Types[i].Metrics {
-				if r.Name != name || r.Reason == "" {
-					continue
-				}
-
-				j, ok := index[r.Reason]
-				if !ok {
-					j = len(entries)
-					index[r.Reason] = j
-					entries = append(entries, entry{reason: r.Reason})
-				}
-
-				entries[j].types = append(entries[j].types, pkg.Types[i].Name)
-			}
-		}
-
-		for _, e := range entries {
-			who := strings.Join(e.types, ", ")
-			if len(e.types) == len(pkg.Types) && len(pkg.Types) > 1 {
-				who = "all types"
-			}
-
-			notes = append(notes, name+": "+e.reason+" ("+who+")")
-		}
+		notes = append(notes, "reusability: "+e.reason+" ("+who+")")
 	}
 
 	return notes
@@ -764,39 +699,33 @@ func CSVHeader() []string {
 	return []string{
 		"package",
 		"type",
-		"metric",
-		"scope",
-		"value",
+		"reusability",
 		"applicable",
 		"reason",
 		"definition",
 	}
 }
 
-// CSVRecords flattens the report into one record per entity and metric, in
-// report order.
+// CSVRecords flattens the report into one row per type, in report order.
 func CSVRecords(report reusability.Report) [][]string {
 	var records [][]string
 
-	appendRecords := func(pkgPath, typeName string, results []metrics.MetricResult) {
-		for _, r := range results {
+	for i := range report.Packages {
+		pkg := &report.Packages[i]
+
+		for j := range pkg.Types {
+			typ := &pkg.Types[j]
+			r := typ.Reusability
+
 			value := ""
 			if r.Applicable {
 				value = FormatValue(r.Value)
 			}
 
 			records = append(records, []string{
-				pkgPath, typeName, r.Name, string(r.Scope), value,
+				pkg.Path, typ.Name, value,
 				strconv.FormatBool(r.Applicable), r.Reason, r.Definition,
 			})
-		}
-	}
-
-	for i := range report.Packages {
-		pkg := &report.Packages[i]
-
-		for j := range pkg.Types {
-			appendRecords(pkg.Path, pkg.Types[j].Name, pkg.Types[j].Metrics)
 		}
 	}
 

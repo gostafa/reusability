@@ -24,59 +24,20 @@ func (nopCloser) Close() error { return nil }
 
 func report() reusability.Report {
 	return reusability.Report{
-		SchemaVersion: "1",
+		SchemaVersion: "6",
 		Tool:          reusability.ToolInfo{Name: "reusability", Version: "test"},
 		Module:        "example.com/m",
 		Packages: []reusability.PackageReport{
 			{
-				Path:   "example.com/m/a",
-				Vars:   1,
-				Consts: 1,
-				Variables: []reusability.DeclarationReport{{
-					Name:     "Config",
-					Exported: true,
-					Position: reusability.Position{File: "a/a.go", Line: 3, Column: 5},
-				}},
-				Constants: []reusability.DeclarationReport{{
-					Name:     "Mode",
-					Exported: true,
-					Position: reusability.Position{File: "a/a.go", Line: 4, Column: 7},
-				}},
-				Functions: []reusability.FunctionReport{{
-					Name:       "Run",
-					Exported:   true,
-					Position:   reusability.Position{File: "a/a.go", Line: 6, Column: 1},
-					Lines:      5,
-					Cyclomatic: 2,
-					Branches:   reusability.BranchStats{Ifs: 1},
-				}},
+				Path: "example.com/m/a",
 				Types: []reusability.TypeReport{{
-					Name:     "A",
-					Exported: true,
-					Kind:     "struct",
-					Position: reusability.Position{File: "a/a.go", Line: 10, Column: 6},
-					Fields:   1,
-					FieldDetails: []reusability.FieldReport{{
-						Name:     "Value",
-						Exported: true,
-					}},
-					Methods: 1,
-					MethodDetails: []reusability.FunctionReport{{
-						Name:       "Do",
-						Exported:   true,
-						Receiver:   "A",
-						Position:   reusability.Position{File: "a/a.go", Line: 12, Column: 1},
-						Lines:      1,
-						Cyclomatic: 1,
-					}},
-					Metrics: []metrics.MetricResult{
-						{
-							Name:       "reusability",
-							Scope:      metrics.ScopeType,
-							Value:      0.7,
-							Applicable: true,
-							Definition: "d",
-						},
+					Name: "A",
+					Reusability: metrics.MetricResult{
+						Name:       "reusability",
+						Scope:      metrics.ScopeType,
+						Value:      0.7,
+						Applicable: true,
+						Definition: "d",
 					},
 				}},
 			},
@@ -116,29 +77,25 @@ func TestWriteJSON(t *testing.T) {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 
-	if got["schema_version"] != "1" {
+	if got["schema_version"] != "6" {
 		t.Errorf("schema_version = %v", got["schema_version"])
 	}
 	pkg := got["packages"].([]any)[0].(map[string]any)
-	if pkg["vars"].(float64) != 1 || pkg["consts"].(float64) != 1 {
-		t.Fatalf("package counts = vars %v consts %v", pkg["vars"], pkg["consts"])
-	}
-	fn := pkg["functions"].([]any)[0].(map[string]any)
-	if fn["name"] != "Run" || fn["cyclomatic"].(float64) != 2 || fn["lines"].(float64) != 5 {
-		t.Fatalf("function details = %+v", fn)
+	if _, ok := pkg["afferent"]; ok {
+		t.Fatal("package afferent should not appear in JSON schema v6")
 	}
 	typ := pkg["types"].([]any)[0].(map[string]any)
-	if typ["kind"] != "struct" || typ["exported"] != true {
-		t.Fatalf("type details = %+v", typ)
+	if typ["name"] != "A" {
+		t.Fatalf("type name = %+v", typ["name"])
 	}
-	method := typ["method_details"].([]any)[0].(map[string]any)
-	if method["receiver"] != "A" || method["name"] != "Do" {
-		t.Fatalf("method details = %+v", method)
+	reuse := typ["reusability"].(map[string]any)
+	if reuse["value"].(float64) != 0.7 {
+		t.Fatalf("reusability = %+v", reuse)
 	}
 }
 
 // Black-box: the CSV format starts with the canonical header and has a row per
-// entity/metric.
+// type.
 func TestWriteCSV(t *testing.T) {
 	t.Parallel()
 

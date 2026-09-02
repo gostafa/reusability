@@ -28,33 +28,21 @@ func TestWriteWeb(t *testing.T) {
 	for _, want := range []string{
 		`id="report-data"`,
 		`"module":"example.com/m"`,
-		`"schema_version":"1"`,
-		`"functions":[{"name":"Run"`,
-		`"variables":[{"name":"Config"`,
-		`"method_details":[{"name":"Do"`,
+		`"schema_version":"6"`,
 		`"reusability"`,
 		`id="docs-data"`,
 		`"formula_mathml"`,
 		`id="report-table"`,
 		`id="report-head"`,
 		`id="report-body"`,
-		`id="kind-pills"`,
-		`id="export-pills"`,
 		`data-sort`,
 		`aria-sort`,
 		`class: 'help'`,
 		`data-help`,
-		`Cyclomatic complexity for the function`,
 		`summarizeNode`,
 		`aggregateMetricCell`,
 		`meanStat`,
-		`Packages`,
-		`Vars`,
-		`Consts`,
-		`Funcs`,
 		`All`,
-		`Exported`,
-		`Types`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("web report is missing %q", want)
@@ -67,8 +55,8 @@ func TestWriteWeb(t *testing.T) {
 		}
 	}
 
-	if strings.Contains(html, `label: 'Position'`) {
-		t.Error("web report still defines a Position column")
+	if strings.Contains(html, `label: 'Position'`) || strings.Contains(html, `"kind"`) {
+		t.Error("web report still defines removed structural columns")
 	}
 
 	// Self-containment: nothing on the page may fetch an external resource.

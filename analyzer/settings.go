@@ -9,8 +9,7 @@ import (
 )
 
 // Settings configures the reusability policy analyzer. Analysis fields map to
-// the reusability.Config facade. Policy fields use the same package/type
-// min/max shape as CLI thresholds, but are decoded directly from
+// the reusability.Config facade. Policy rules are decoded directly from
 // golangci-lint's linters.settings.custom.reusability.settings block.
 type Settings struct {
 	// Directory is the working directory for package loading. Empty means the
@@ -35,17 +34,9 @@ type Settings struct {
 	// ReusabilityWeights overrides the reusability component weights. Omitted
 	// fields keep their defaults; explicit zero values are allowed.
 	ReusabilityWeights *ReusabilityWeightSettings `json:"reusability-weights"`
-	// Package configures package-level structural and metric limits. Nil,
-	// together with nil Type, Funcs, and Metrics, selects the recommended
-	// defaults.
-	Package *PackageSettings `json:"package"`
-	// Type configures type-level structural and metric limits.
-	Type *TypeSettings `json:"type"`
-	// Funcs configures function and method detail limits.
-	Funcs *FuncSettings `json:"funcs"`
-	// Metrics configures legacy/global metric limits. Prefer the scoped metric
-	// maps under Package and Type for new configurations.
-	Metrics map[string]LimitSettings `json:"metrics"`
+	// Rules maps package-path glob patterns to minimum type-level reusability
+	// thresholds. Empty selects DefaultRules() (catch-all min 0.7).
+	Rules []RuleSettings `json:"rules"`
 }
 
 // ReusabilityWeightSettings configures the component weights used by the
@@ -82,7 +73,7 @@ func (s Settings) validate() error {
 		return err
 	}
 
-	_, err := s.policy()
+	_, err := s.rules()
 
 	return err
 }

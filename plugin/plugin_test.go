@@ -21,21 +21,9 @@ func TestNewBuildAnalyzersAndLoadMode(t *testing.T) {
 			"testability":   0.3,
 			"documentation": 0.4,
 		},
-		"funcs": map[string]any{
-			"lines":      map[string]any{"max": 80},
-			"cyclomatic": map[string]any{"max": 10},
-		},
-		"package": map[string]any{
-			"types": 10,
-			"funcs": map[string]any{
-				"max": 20,
-			},
-		},
-		"type": map[string]any{
-			"fields": map[string]any{"max": 14},
-			"metrics": map[string]any{
-				"reusability": map[string]any{"min": 0.3},
-			},
+		"rules": []any{
+			map[string]any{"pattern": "**/internal/**", "min": 0.8},
+			map[string]any{"pattern": "**", "min": 0.6},
 		},
 	})
 	if err != nil {
@@ -112,15 +100,8 @@ func TestNewRejectsUnknownInlinePolicySettings(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]any{
-		"structural key": map[string]any{
-			"package": map[string]any{"bogus": 1},
-		},
-		"limit key": map[string]any{
-			"type": map[string]any{
-				"metrics": map[string]any{
-					"amc": map[string]any{"maks": 3},
-				},
-			},
+		"unknown rule key": map[string]any{
+			"rules": []any{map[string]any{"pattern": "**", "maximum": 1}},
 		},
 		"reusability weight key": map[string]any{
 			"reusability-weights": map[string]any{"collaboration": 1},
@@ -152,18 +133,14 @@ func TestNewRejectsInvalidAnalyzerSettings(t *testing.T) {
 	}
 
 	p, err = plugin.New(map[string]any{
-		"type": map[string]any{
-			"metrics": map[string]any{
-				"distance": map[string]any{"max": 0.5},
-			},
-		},
+		"rules": []any{map[string]any{"pattern": "**", "min": 2}},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if _, err = p.BuildAnalyzers(); err == nil {
-		t.Fatal("expected BuildAnalyzers error for package-only metric under type")
+		t.Fatal("expected BuildAnalyzers error for invalid rule min")
 	}
 
 	p, err = plugin.New(map[string]any{

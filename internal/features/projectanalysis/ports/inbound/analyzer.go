@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	typefacts "github.com/gostafa/reusability/internal/features/typefacts/domain"
 	"github.com/gostafa/reusability/internal/shared/metrics"
 )
 
@@ -33,80 +32,18 @@ type Options struct {
 	Weights metrics.ReusabilityWeights
 }
 
-// TypeResult carries one type's display metrics in the fixed metric order.
+// TypeResult carries one type's reusability metric.
 type TypeResult struct {
 	// Name is the type's declared name.
 	Name string
-	// Exported reports whether the type name is exported.
-	Exported bool
-	// Kind classifies the type's underlying type.
-	Kind typefacts.TypeKind
-	// Pos locates the type declaration in source.
-	Pos typefacts.Position
-	// Fields is the type's struct field count (embedded fields count one).
-	Fields int
-	// FieldDetails holds the struct fields in declaration order.
-	FieldDetails []typefacts.FieldFacts
-	// Methods is the type's declared method count.
-	Methods int
-	// MethodDetails holds the declared methods in report order.
-	MethodDetails []FunctionResult
-	// Metrics holds the type's display metrics in the fixed metric order.
-	Metrics []metrics.MetricResult
+	// Reusability is the type-level reusability index result.
+	Reusability metrics.MetricResult
 }
 
-// DeclarationResult carries one top-level variable or constant declaration.
-type DeclarationResult struct {
-	// Name is the declared identifier.
-	Name string
-	// Exported reports whether the declaration name is exported.
-	Exported bool
-	// Pos locates the declaration in source.
-	Pos typefacts.Position
-}
-
-// FunctionResult carries one function or method's structural details.
-type FunctionResult struct {
-	// Name is the declared function or method name.
-	Name string
-	// Exported reports whether the function name is exported.
-	Exported bool
-	// Receiver is the declaring type name for methods; empty for free funcs.
-	Receiver string
-	// Pos locates the declaration in source.
-	Pos typefacts.Position
-	// Lines is the inclusive source line count from func keyword to end.
-	Lines int
-	// Cyclomatic is the cyclomatic complexity score.
-	Cyclomatic int
-	// Branches are the syntax counts feeding cyclomatic complexity.
-	Branches typefacts.BranchStats
-}
-
-// PackageResult carries one package's display metrics and analyzed types.
+// PackageResult carries one package's analyzed types.
 type PackageResult struct {
 	// Path is the package's import path.
 	Path string
-	// Afferent counts analyzed packages importing this package (Ca).
-	Afferent int
-	// Efferent counts this package's in-scope imports (Ce).
-	Efferent int
-	// ExportedFuncs counts the package's declared functions and methods with
-	// an exported name.
-	ExportedFuncs int
-	// UnexportedFuncs counts the package's declared functions and methods with
-	// an unexported name.
-	UnexportedFuncs int
-	// Vars counts top-level variable names declared in the package.
-	Vars int
-	// Consts counts top-level constant names declared in the package.
-	Consts int
-	// Variables are the package's top-level variable declarations.
-	Variables []DeclarationResult
-	// Constants are the package's top-level constant declarations.
-	Constants []DeclarationResult
-	// Functions are the package's top-level functions, excluding methods.
-	Functions []FunctionResult
 	// Types are the package's analyzed types, sorted by name.
 	Types []TypeResult
 }
@@ -117,7 +54,7 @@ func (p PackageResult) String() string {
 }
 
 // Result is a deterministic analysis outcome: packages sorted by import
-// path, types by name, metrics in the fixed order.
+// path, types by name.
 type Result struct {
 	// ModulePath is the analyzed main module's path, when known.
 	ModulePath string

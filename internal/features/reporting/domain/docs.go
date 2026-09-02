@@ -69,9 +69,9 @@ const formulaReusability = `<math display="block" alttext="RI = w_c C + w_k (1 -
 <math display="block" alttext="T = \frac{1}{1 + \max(0, AMC - 1)}"><mrow><mi>T</mi><mo>=</mo><mfrac><mn>1</mn><mrow><mn>1</mn><mo>+</mo><mi>max</mi><mo stretchy="false">(</mo><mn>0</mn><mo>,</mo><mi>AMC</mi><mo>−</mo><mn>1</mn><mo stretchy="false">)</mo></mrow></mfrac></mrow></math>
 <math display="block" alttext="D = \frac{documented exported members}{exported members}"><mrow><mi>D</mi><mo>=</mo><mfrac><mtext>documented exported members</mtext><mtext>exported members</mtext></mfrac></mrow></math>`
 
-// MetricDocs returns the guide entries for the reported metric and
-// structural columns. Internal inputs (AMC, LCOM, TCC, CBO) are described
-// in the reusability formula; they are not documented as selectable metrics.
+// MetricDocs returns the guide entries for the reported metric. Internal
+// inputs (AMC, LCOM, TCC, CBO) are described in the reusability formula;
+// they are not documented as selectable metrics.
 func MetricDocs() []MetricDoc {
 	return []MetricDoc{
 		{
@@ -89,94 +89,6 @@ func MetricDocs() []MetricDoc {
 			Direction:      DirectionHigher,
 			Bounded:        true,
 			Example:        "C = 0.8, 1 − K = 0.75, T = 0.5, D = 1.0 with default weights: RI = 0.35·0.8 + 0.25·0.75 + 0.25·0.5 + 0.15·1.0 ≈ 0.74.",
-		},
-		{
-			Name:           "ca",
-			Label:          "Ca",
-			FullName:       "Afferent coupling",
-			Scope:          DocScopeStructural,
-			Summary:        "How many analyzed packages import this package.",
-			HowCalculated:  "Counted within the analyzed set only — importers outside the analysis are not observable, so the value depends on the patterns you analyze.",
-			Interpretation: "A neutral count with no good/bad color. High Ca marks load-bearing packages: many others break when this one changes, so it should be stable and well tested. It is the incoming half of instability.",
-			Direction:      DirectionNeutral,
-			Example:        "If 3 analyzed packages import example.com/m/util, its Ca is 3.",
-		},
-		{
-			Name:           "ce",
-			Label:          "Ce",
-			FullName:       "Efferent coupling",
-			Scope:          DocScopeStructural,
-			Summary:        "How many packages this package imports, within the dependency scope.",
-			HowCalculated:  "The package's imports that fall in the configured -dependency-scope: project counts only other analyzed packages, module counts packages of the main module, all counts every import. Duplicates and self-imports are ignored.",
-			Interpretation: "A neutral count with no good/bad color. High Ce means the package has many reasons to change. It is the outgoing half of instability.",
-			Direction:      DirectionNeutral,
-			Example:        "A package importing 2 in-scope packages has Ce = 2 regardless of how often each is imported.",
-		},
-		{
-			Name:           "funcs",
-			Label:          "Funcs",
-			FullName:       "Functions",
-			Scope:          DocScopeStructural,
-			Summary:        "Declared functions and methods in the package.",
-			HowCalculated:  "Counted over the package's analyzed files — excluded files (tests or generated code, unless included by flag) do not contribute.",
-			Interpretation: "A neutral size measure: use it to weigh the metrics — a package with 3 funcs and a package with 300 deserve different scrutiny at the same scores.",
-			Direction:      DirectionNeutral,
-			Example:        "A package with 4 functions and 6 methods across its types shows Funcs = 10.",
-		},
-		{
-			Name:           "vars",
-			Label:          "Vars",
-			FullName:       "Variables",
-			Scope:          DocScopeStructural,
-			Summary:        "Top-level variable names declared in the package.",
-			HowCalculated:  "Counts each non-blank identifier in package-level var declarations over analyzed files. Local variables inside functions and methods do not contribute.",
-			Interpretation: "A neutral size measure. High values can signal broad package-level mutable state, but context matters.",
-			Direction:      DirectionNeutral,
-			Example:        "var a, b int contributes Vars = 2; var _ = setup() contributes 0.",
-		},
-		{
-			Name:           "consts",
-			Label:          "Consts",
-			FullName:       "Constants",
-			Scope:          DocScopeStructural,
-			Summary:        "Top-level constant names declared in the package.",
-			HowCalculated:  "Counts each non-blank identifier in package-level const declarations over analyzed files. Local constants inside functions and methods do not contribute.",
-			Interpretation: "A neutral size measure. Many constants may be harmless domain vocabulary or a sign that related values could be grouped.",
-			Direction:      DirectionNeutral,
-			Example:        "const A, B = 1, 2 contributes Consts = 2; const _ = iota contributes 0.",
-		},
-		{
-			Name:           "types",
-			Label:          "Types",
-			FullName:       "Named types",
-			Scope:          DocScopeStructural,
-			Summary:        "Analyzed named types declared in the package.",
-			HowCalculated:  "Counts the package's named type declarations that enter the analysis; type aliases never enter the model.",
-			Interpretation: "A neutral size measure, shown in the Packages view. Many types with poor cohesion scores is a stronger signal than one outlier.",
-			Direction:      DirectionNeutral,
-			Example:        "A package declaring Service, Config, and an Option interface shows Types = 3.",
-		},
-		{
-			Name:           "fields",
-			Label:          "Fields",
-			FullName:       "Struct fields",
-			Scope:          DocScopeStructural,
-			Summary:        "The type's struct field count.",
-			HowCalculated:  "An embedded field counts as one; members promoted through embedding are not counted. Non-struct types show 0.",
-			Interpretation: "A neutral count that sizes the cohesion metrics: LCOM and TCC both reason about how methods use these fields.",
-			Direction:      DirectionNeutral,
-			Example:        "struct { ID int; Name string; sync.Mutex } has Fields = 3 — the embedded mutex counts as one.",
-		},
-		{
-			Name:           "methods",
-			Label:          "Methods",
-			FullName:       "Declared methods",
-			Scope:          DocScopeStructural,
-			Summary:        "The type's declared method count.",
-			HowCalculated:  "Value- and pointer-receiver methods are counted alike; methods promoted from embedded types are excluded.",
-			Interpretation: "A neutral count that sizes the cohesion and complexity metrics: most of them are n/a below 1 or 2 methods, by design rather than as a gap.",
-			Direction:      DirectionNeutral,
-			Example:        "A type with func (s *S) Open() and func (s S) Close() has Methods = 2.",
 		},
 	}
 }

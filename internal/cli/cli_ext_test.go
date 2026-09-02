@@ -50,7 +50,7 @@ func TestRunFixtureJSON(t *testing.T) {
 		t.Fatalf("invalid JSON report: %v", err)
 	}
 
-	if got["schema_version"] != "4" {
+	if got["schema_version"] != "6" {
 		t.Errorf("schema_version = %v", got["schema_version"])
 	}
 
@@ -59,20 +59,22 @@ func TestRunFixtureJSON(t *testing.T) {
 		t.Errorf("packages = %d, want >= 7", len(pkgs))
 	}
 
-	// Schema v4 structural facts are present on packages and types.
 	first := pkgs[0].(map[string]any)
 	for _, key := range []string{"afferent", "efferent", "funcs", "vars", "consts", "functions", "variables", "constants"} {
-		if _, ok := first[key]; !ok {
-			t.Errorf("package is missing structural fact %q", key)
+		if _, ok := first[key]; ok {
+			t.Errorf("package should not include removed field %q", key)
 		}
 	}
 
 	if types := first["types"].([]any); len(types) > 0 {
 		typ := types[0].(map[string]any)
-		for _, key := range []string{"fields", "methods", "kind", "position", "field_details", "method_details"} {
-			if _, ok := typ[key]; !ok {
-				t.Errorf("type is missing structural fact %q", key)
+		for _, key := range []string{"fields", "methods", "kind", "position", "field_details", "method_details", "metrics", "exported"} {
+			if _, ok := typ[key]; ok {
+				t.Errorf("type should not include removed field %q", key)
 			}
+		}
+		if _, ok := typ["reusability"]; !ok {
+			t.Error("type is missing reusability field")
 		}
 	}
 }
@@ -195,34 +197,25 @@ func chdirFixture(t *testing.T) {
 	t.Chdir(fixture)
 }
 
-// Black-box: a violated condition exits 3. `types` max 0 is broken by any
-// package that declares a type, so this does not depend on fixture metrics.
+// Black-box: a violated rule exits 3.
 func TestRunCheckFailsExitsThree(t *testing.T) {
 	chdirFixture(t)
 
 	if code := cli.Run(
-		[]string{"--max", "types=0", "--output", filepath.Join(t.TempDir(), "r.txt"), "./..."},
+		[]string{"--check", `--rule=**:0.99`, "--output", filepath.Join(t.TempDir(), "r.txt"), "./..."},
 	); code != 3 {
 		t.Fatalf("exit code = %d, want 3", code)
 	}
 }
 
-// Black-box: a satisfiable flag-only policy passes with exit 0, exercising
-// structural, package-metric, and type-metric bounds at once.
+// Black-box: a satisfiable flag-only policy passes with exit 0.
 func TestRunCheckFlagPolicyPasses(t *testing.T) {
 	chdirFixture(t)
 
 	args := []string{
+		"--check",
 		"--output", filepath.Join(t.TempDir(), "r.txt"),
-		"--max=types=100000",
-		"--max=funcs=100000",
-		"--max=vars=100000",
-		"--max=consts=100000",
-		"--max=afferent=100000",
-		"--max=efferent=100000",
-		"--max=fields=100000",
-		"--max=methods=100000",
-		"--min=type.reusability=0",
+		`--rule=**:0`,
 		"./...",
 	}
 
@@ -231,22 +224,21 @@ func TestRunCheckFlagPolicyPasses(t *testing.T) {
 	}
 }
 
-// Black-box: an unknown override key is a usage error (exit 2), and gating
-// never runs without a policy flag.
+// Black-box: an invalid rule is a usage error (exit 2), and gating
+// never runs without at least one -rule.
 func TestRunCheckKeyAndTriggers(t *testing.T) {
 	chdirFixture(t)
 
 	out := filepath.Join(t.TempDir(), "r.txt")
 
-	if code := cli.Run([]string{"--max", "bogus=5", "--output", out, "./..."}); code != 2 {
-		t.Fatalf("unknown key exit = %d, want 2", code)
+	if code := cli.Run([]string{"--check", `--rule=not-a-number`, "--output", out, "./..."}); code != 2 {
+		t.Fatalf("invalid rule exit = %d, want 2", code)
 	}
 
 	if code := cli.Run([]string{"--check", "--output", out, "./..."}); code != 2 {
 		t.Fatalf("empty check exit = %d, want 2", code)
 	}
 
-	// No policy flag → no gate, even though types=0 would fail under one.
 	if code := cli.Run([]string{"--output", out, "./..."}); code != 0 {
 		t.Fatalf("ungated exit = %d, want 0", code)
 	}

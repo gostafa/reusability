@@ -33,20 +33,10 @@ type docRange struct {
 func extractPackage(pkg *packages.Package, opts extractorOptions) domain.PackageExtract {
 	generated, funcDecls, typeDocs, fieldDocs := indexSyntax(pkg)
 
-	variables, constants, functions := packageDecls(pkg, opts, generated)
-	exported, unexported := functionExportCounts(pkg, opts.includeGenerated, generated)
-
 	out := domain.PackageExtract{
-		Path:                pkg.PkgPath,
-		InModule:            inModule(pkg, opts.modulePath),
-		Imports:             importPaths(pkg),
-		ExportedFuncCount:   exported,
-		UnexportedFuncCount: unexported,
-		VarCount:            len(variables),
-		ConstCount:          len(constants),
-		Variables:           variables,
-		Constants:           constants,
-		Functions:           functions,
+		Path:     pkg.PkgPath,
+		InModule: inModule(pkg, opts.modulePath),
+		Imports:  importPaths(pkg),
 	}
 
 	scope := pkg.Types.Scope()
@@ -70,134 +60,6 @@ func extractPackage(pkg *packages.Package, opts extractorOptions) domain.Package
 	}
 
 	return out
-}
-
-// functionExportCounts counts declared functions and methods in non-excluded
-// files, split by exportedness. It preserves the historical package count.
-func functionExportCounts(
-	pkg *packages.Package,
-	includeGenerated bool,
-	generated map[string]bool,
-) (exported, unexported int) {
-	for _, file := range pkg.Syntax {
-		if !includeGenerated && generated[pkg.Fset.Position(file.Package).Filename] {
-			continue
-		}
-
-		for _, decl := range file.Decls {
-			if decl, ok := decl.(*ast.FuncDecl); ok {
-				if decl.Name.IsExported() {
-					exported++
-				} else {
-					unexported++
-				}
-			}
-		}
-	}
-
-	return exported, unexported
-}
-
-// packageDecls extracts top-level declarations that belong directly to the
-// package detail view: vars, consts, and free functions.
-func packageDecls(
-	pkg *packages.Package,
-	opts extractorOptions,
-	generated map[string]bool,
-) (variables, constants []domain.DeclarationFacts, functions []domain.FunctionFacts) {
-	for _, file := range pkg.Syntax {
-		if !opts.includeGenerated && generated[pkg.Fset.Position(file.Package).Filename] {
-			continue
-		}
-
-		for _, decl := range file.Decls {
-			switch decl := decl.(type) {
-			case *ast.FuncDecl:
-				if decl.Recv == nil {
-					functions = append(functions, functionFacts(pkg.Fset, opts.baseDir, decl))
-				}
-			case *ast.GenDecl:
-				switch decl.Tok {
-				case token.VAR:
-					variables = append(variables, valueDecls(pkg.Fset, opts.baseDir, decl)...)
-				case token.CONST:
-					constants = append(constants, valueDecls(pkg.Fset, opts.baseDir, decl)...)
-				}
-			}
-		}
-	}
-
-	sort.Slice(variables, func(i, j int) bool { return declLess(variables[i], variables[j]) })
-	sort.Slice(constants, func(i, j int) bool { return declLess(constants[i], constants[j]) })
-	sort.Slice(functions, func(i, j int) bool { return functionLess(functions[i], functions[j]) })
-
-	return variables, constants, functions
-}
-
-func valueDecls(fset *token.FileSet, baseDir string, decl *ast.GenDecl) []domain.DeclarationFacts {
-	var out []domain.DeclarationFacts
-	for _, spec := range decl.Specs {
-		value, ok := spec.(*ast.ValueSpec)
-		if !ok {
-			continue
-		}
-
-		for _, name := range value.Names {
-			if name.Name != "_" {
-				out = append(out, domain.DeclarationFacts{
-					Name:     name.Name,
-					Exported: name.IsExported(),
-					Pos:      position(fset, baseDir, name.Pos()),
-				})
-			}
-		}
-	}
-
-	return out
-}
-
-func functionFacts(fset *token.FileSet, baseDir string, decl *ast.FuncDecl) domain.FunctionFacts {
-	facts := domain.FunctionFacts{
-		Name:     decl.Name.Name,
-		Exported: decl.Name.IsExported(),
-		Pos:      position(fset, baseDir, decl.Pos()),
-		Lines:    lineCount(fset, decl.Pos(), decl.End()),
-	}
-	ast.Inspect(decl.Body, func(n ast.Node) bool {
-		countBranch(n, &facts.Branches)
-
-		return true
-	})
-
-	return facts
-}
-
-func declLess(a, b domain.DeclarationFacts) bool {
-	if a.Pos.File != b.Pos.File {
-		return a.Pos.File < b.Pos.File
-	}
-	if a.Pos.Line != b.Pos.Line {
-		return a.Pos.Line < b.Pos.Line
-	}
-	if a.Pos.Column != b.Pos.Column {
-		return a.Pos.Column < b.Pos.Column
-	}
-
-	return a.Name < b.Name
-}
-
-func functionLess(a, b domain.FunctionFacts) bool {
-	if a.Pos.File != b.Pos.File {
-		return a.Pos.File < b.Pos.File
-	}
-	if a.Pos.Line != b.Pos.Line {
-		return a.Pos.Line < b.Pos.Line
-	}
-	if a.Pos.Column != b.Pos.Column {
-		return a.Pos.Column < b.Pos.Column
-	}
-
-	return a.Name < b.Name
 }
 
 // indexSyntax walks the ASTs once, recording generated files, method

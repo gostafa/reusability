@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/gostafa/reusability/internal/shared/metrics"
 	"github.com/gostafa/reusability/reusability"
 )
 
@@ -78,47 +79,27 @@ func findType(t *testing.T, pkg reusability.PackageReport, name string) reusabil
 	return reusability.TypeReport{}
 }
 
-func metric(
-	t *testing.T,
-	results []reusability.MetricResult,
-	name string,
-) reusability.MetricResult {
+func wantValue(t *testing.T, r reusability.MetricResult, want float64) {
 	t.Helper()
 
-	for _, r := range results {
-		if r.Name == name {
-			return r
-		}
-	}
-
-	t.Fatalf("metric %s not present in %v", name, results)
-
-	return reusability.MetricResult{}
-}
-
-func wantValue(t *testing.T, results []reusability.MetricResult, name string, want float64) {
-	t.Helper()
-
-	r := metric(t, results, name)
 	if !r.Applicable {
-		t.Fatalf("%s not applicable (%s), want %v", name, r.Reason, want)
+		t.Fatalf("reusability not applicable (%s), want %v", r.Reason, want)
 	}
 
 	if math.Abs(r.Value-want) > epsilon {
-		t.Fatalf("%s = %v, want %v", name, r.Value, want)
+		t.Fatalf("reusability = %v, want %v", r.Value, want)
 	}
 }
 
-func wantNotApplicable(t *testing.T, results []reusability.MetricResult, name string) {
+func wantNotApplicable(t *testing.T, r reusability.MetricResult) {
 	t.Helper()
 
-	r := metric(t, results, name)
 	if r.Applicable {
-		t.Fatalf("%s applicable with value %v, want n/a", name, r.Value)
+		t.Fatalf("reusability applicable with value %v, want n/a", r.Value)
 	}
 
 	if r.Reason == "" {
-		t.Fatalf("%s n/a without reason", name)
+		t.Fatalf("reusability n/a without reason")
 	}
 }
 
@@ -154,57 +135,25 @@ func TestAnalyzeOrderType(t *testing.T) {
 	report := analyzeFixture(t, nil)
 	order := findType(t, findPackage(t, report, "example.com/fixture/orders"), "Order")
 
-	if order.Kind != "struct" || !order.Exported || order.Position.File != "orders/orders.go" {
-		t.Fatalf("order type details = %+v", order)
-	}
-	if len(order.FieldDetails) != 3 || order.FieldDetails[0].Name != "ID" {
-		t.Fatalf("order field details = %+v", order.FieldDetails)
-	}
-	if len(order.MethodDetails) != 3 {
-		t.Fatalf("order method details = %+v", order.MethodDetails)
-	}
-	grandTotal := findFunctionReport(t, order.MethodDetails, "GrandTotal")
-	if grandTotal.Receiver != "Order" || grandTotal.Cyclomatic != 3 || grandTotal.Lines != 6 {
-		t.Fatalf("GrandTotal details = %+v", grandTotal)
+	if order.Name != "Order" {
+		t.Fatalf("order type name = %q, want Order", order.Name)
 	}
 
 	wantRI := 0.35*(1.0/3) + 0.25*0.5 + 0.25*0.6 + 0.15*(2.0/3)
-	wantValue(t, order.Metrics, "reusability", wantRI)
+	wantValue(t, order.Reusability, wantRI)
 
-	// Supporting metrics are computed internally but never displayed.
-	for _, r := range order.Metrics {
-		if r.Name != "reusability" {
-			t.Fatalf("unexpected displayed metric %q", r.Name)
-		}
+	if order.Reusability.Name != metrics.MetricReusability {
+		t.Fatalf("unexpected metric name %q", order.Reusability.Name)
 	}
 }
 
-func findFunctionReport(t *testing.T, functions []reusability.FunctionReport, name string) reusability.FunctionReport {
-	t.Helper()
-
-	for _, fn := range functions {
-		if fn.Name == name {
-			return fn
-		}
-	}
-
-	t.Fatalf("function %s not found in %+v", name, functions)
-
-	return reusability.FunctionReport{}
-}
-
-func TestAnalyzePackageStructuralFacts(t *testing.T) {
+func TestAnalyzePackageCouplingFacts(t *testing.T) {
 	report := analyzeFixture(t, nil)
-
-	orders := findPackage(t, report, "example.com/fixture/orders")
-	if orders.Vars != 0 || orders.Consts != 0 {
-		t.Fatalf("orders counts = vars %d consts %d, want 0 and 0", orders.Vars, orders.Consts)
-	}
 
 	store := findPackage(t, report, "example.com/fixture/store")
 	storeType := findType(t, store, "Store")
-	if len(storeType.Metrics) != 1 || storeType.Metrics[0].Name != "reusability" {
-		t.Fatalf("Store metrics = %v, want reusability only", storeType.Metrics)
+	if storeType.Reusability.Name != metrics.MetricReusability {
+		t.Fatalf("Store reusability = %v, want reusability metric", storeType.Reusability)
 	}
 }
 
@@ -219,8 +168,8 @@ func TestAnalyzeGenericsAndEmbedding(t *testing.T) {
 		{"example.com/fixture/embedding", "Base"},
 	} {
 		got := findType(t, findPackage(t, report, loc.pkg), loc.typ)
-		if len(got.Metrics) != 1 || got.Metrics[0].Name != "reusability" {
-			t.Fatalf("%s.%s metrics = %v, want reusability only", loc.pkg, loc.typ, got.Metrics)
+		if got.Reusability.Name != metrics.MetricReusability {
+			t.Fatalf("%s.%s reusability = %v, want reusability metric", loc.pkg, loc.typ, got.Reusability)
 		}
 	}
 }
@@ -228,13 +177,13 @@ func TestAnalyzeGenericsAndEmbedding(t *testing.T) {
 func TestAnalyzeTransitiveFieldUsage(t *testing.T) {
 	direct := analyzeFixture(t, nil)
 	counter := findType(t, findPackage(t, direct, "example.com/fixture/multifile"), "Counter")
-	directRI := metric(t, counter.Metrics, "reusability")
+	directRI := counter.Reusability
 
 	transitive := analyzeFixture(t, func(cfg *reusability.Config) {
 		cfg.FieldUsageMode = reusability.FieldUsageTransitive
 	})
 	counter = findType(t, findPackage(t, transitive, "example.com/fixture/multifile"), "Counter")
-	transitiveRI := metric(t, counter.Metrics, "reusability")
+	transitiveRI := counter.Reusability
 	if !directRI.Applicable || !transitiveRI.Applicable {
 		t.Fatalf("reusability n/a: direct %+v transitive %+v", directRI, transitiveRI)
 	}
@@ -255,8 +204,8 @@ func TestAnalyzeGeneratedFiles(t *testing.T) {
 	report = analyzeFixture(t, func(cfg *reusability.Config) { cfg.IncludeGenerated = true })
 	gen = findPackage(t, report, "example.com/fixture/gen")
 	machine := findType(t, gen, "Machine")
-	if len(machine.Metrics) != 1 || machine.Metrics[0].Name != "reusability" {
-		t.Fatalf("Machine metrics = %v, want reusability", machine.Metrics)
+	if machine.Reusability.Name != metrics.MetricReusability {
+		t.Fatalf("Machine reusability = %v, want reusability metric", machine.Reusability)
 	}
 }
 

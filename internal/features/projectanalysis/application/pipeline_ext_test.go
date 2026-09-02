@@ -50,7 +50,6 @@ func TestPipelineAnalyzeEndToEnd(t *testing.T) {
 		pkgs: []tfdomain.PackageExtract{
 			{
 				Path: "example.com/m/a", InModule: true, Imports: []string{"example.com/m/b"},
-				VarCount: 2, ConstCount: 3,
 				Types: []tfdomain.TypeExtract{
 					{
 						Name:     "A",
@@ -93,15 +92,12 @@ func TestPipelineAnalyzeEndToEnd(t *testing.T) {
 
 	// Type A has one CC-2 method; only reusability is displayed.
 	pkgA := result.Packages[0]
-	if pkgA.Vars != 2 || pkgA.Consts != 3 {
-		t.Fatalf("a counts = vars %d consts %d, want 2 and 3", pkgA.Vars, pkgA.Consts)
-	}
 
 	if len(pkgA.Types) != 1 || pkgA.Types[0].Name != "A" {
 		t.Fatalf("a types = %+v", pkgA.Types)
 	}
 
-	if got := findMetric(t, pkgA.Types[0].Metrics, metrics.MetricReusability); !got.Applicable {
+	if got := pkgA.Types[0].Reusability; !got.Applicable {
 		t.Errorf("A reusability = %+v, want applicable", got)
 	}
 

@@ -23,23 +23,13 @@ func TestRunnerRunReportsPackageAndTypeViolations(t *testing.T) {
 	}
 
 	r := &runner{byPkg: map[string][]policydomain.Violation{
-		"example.com/p": {
-			{
-				Package:    "example.com/p",
-				Key:        policydomain.KeyTypes,
-				Value:      2,
-				Comparator: policydomain.ComparatorMax,
-				Threshold:  1,
-			},
-			{
-				Package:    "example.com/p",
-				Type:       "Widget",
-				Key:        policydomain.KeyMethods,
-				Value:      0.5,
-				Comparator: policydomain.ComparatorMin,
-				Threshold:  1.25,
-			},
-		},
+		"example.com/p": {{
+			Package:   "example.com/p",
+			Type:      "Widget",
+			Value:     0.5,
+			Threshold: 0.8,
+			Rule:      "**",
+		}},
 	}}
 	r.once.Do(func() {})
 
@@ -54,14 +44,11 @@ func TestRunnerRunReportsPackageAndTypeViolations(t *testing.T) {
 	if _, err := r.run(pass); err != nil {
 		t.Fatal(err)
 	}
-	if len(diagnostics) != 2 {
-		t.Fatalf("diagnostics = %#v, want two", diagnostics)
+	if len(diagnostics) != 1 {
+		t.Fatalf("diagnostics = %#v, want one", diagnostics)
 	}
-	if diagnostics[0].Pos != file.Package {
-		t.Errorf("package diagnostic position = %v, want %v", diagnostics[0].Pos, file.Package)
-	}
-	if !strings.Contains(diagnostics[1].Message, "is below min 1.25") {
-		t.Errorf("type diagnostic = %q", diagnostics[1].Message)
+	if !strings.Contains(diagnostics[0].Message, "is below min 0.8") {
+		t.Errorf("type diagnostic = %q", diagnostics[0].Message)
 	}
 
 	sentinel := errors.New("cached load error")
@@ -73,9 +60,8 @@ func TestRunnerRunReportsPackageAndTypeViolations(t *testing.T) {
 }
 
 func TestRunnerLoadErrors(t *testing.T) {
-	r := newRunner(Settings{Type: &TypeSettings{Metrics: map[string]LimitSettings{
-		"lcom": maximum(1),
-	}}}.withDefaults())
+	min := 2.0
+	r := newRunner(Settings{Rules: []RuleSettings{{Pattern: "**", Min: &min}}}.withDefaults())
 	r.load()
 	if r.err == nil || !strings.Contains(r.err.Error(), "reusability policy") {
 		t.Fatalf("policy load error = %v", r.err)
@@ -102,55 +88,24 @@ func TestInlinePolicyDefaultsAndIgnoresModularityFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	defaults, err := (Settings{Directory: dir}).policy()
+	defaults, err := (Settings{Directory: dir}).rules()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !defaults.Package.Types.HasMax || defaults.Package.Types.Max != 12 {
-		t.Fatalf("default types limit = %+v, want max 12", defaults.Package.Types)
+	if len(defaults) != 1 || defaults[0].Pattern != "**" || defaults[0].Min != 0.7 {
+		t.Fatalf("default rules = %+v", defaults)
 	}
 
-	types := maximum(3)
-	funcs := maximumFunc(6)
-	funcLines := maximum(80)
-	funcCyclomatic := maximum(10)
-	vars := maximum(4)
-	consts := maximum(5)
-	inline, err := (Settings{Package: &PackageSettings{
-		Types:  &types,
-		Funcs:  &funcs,
-		Vars:   &vars,
-		Consts: &consts,
-	}, Funcs: &FuncSettings{
-		Lines:      &funcLines,
-		Cyclomatic: &funcCyclomatic,
-	}}).policy()
+	min := 0.6
+	inline, err := (Settings{Rules: []RuleSettings{
+		{Pattern: "**/internal/**", Min: ptr(0.8)},
+		{Pattern: "**", Min: &min},
+	}}).rules()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !inline.Package.Types.HasMax || inline.Package.Types.Max != 3 {
-		t.Fatalf("inline types limit = %+v", inline.Package.Types)
-	}
-	if !inline.Package.Funcs.Count.HasMax || inline.Package.Funcs.Count.Max != 6 {
-		t.Fatalf("inline funcs limit = %+v", inline.Package.Funcs)
-	}
-	if !inline.Funcs.Lines.HasMax || inline.Funcs.Lines.Max != 80 {
-		t.Fatalf("inline funcs lines limit = %+v", inline.Funcs)
-	}
-	if !inline.Funcs.Cyclomatic.HasMax || inline.Funcs.Cyclomatic.Max != 10 {
-		t.Fatalf("inline funcs cyclomatic limit = %+v", inline.Funcs)
-	}
-	if !inline.Package.Vars.HasMax || inline.Package.Vars.Max != 4 {
-		t.Fatalf("inline vars limit = %+v", inline.Package.Vars)
-	}
-	if !inline.Package.Consts.HasMax || inline.Package.Consts.Max != 5 {
-		t.Fatalf("inline consts limit = %+v", inline.Package.Consts)
-	}
-	if inline.Type.Methods.HasMax {
-		t.Fatalf(
-			"inline policy unexpectedly merged default methods limit: %+v",
-			inline.Type.Methods,
-		)
+	if len(inline) != 2 || inline[0].Min != 0.8 || inline[1].Min != 0.6 {
+		t.Fatalf("inline rules = %+v", inline)
 	}
 }
 

@@ -17,9 +17,10 @@ const Name = "reusability"
 // Doc is the short documentation shown by go/analysis tooling.
 const Doc = `enforce Go type-reusability policy thresholds
 
-Reports policy violations for the type-level reusability index and
-structural budgets. Policy thresholds are configured inline in the
-golangci-lint settings block.`
+Reports policy violations when a type's reusability index falls below a
+configured minimum. Rules match package import paths using glob patterns
+(* = one segment, ** = zero or more). Policy rules are configured inline
+in the golangci-lint settings block.`
 
 // New returns a go/analysis Analyzer that loads the module once, evaluates the
 // reusability policy, and emits diagnostics for the package under analysis.
@@ -105,7 +106,7 @@ func computeViolations(
 	settings Settings,
 	analyzer reportAnalyzer,
 ) (map[string][]policydomain.Violation, error) {
-	policy, err := settings.policy()
+	rules, err := settings.rules()
 	if err != nil {
 		return nil, fmt.Errorf("reusability policy: %w", err)
 	}
@@ -118,7 +119,7 @@ func computeViolations(
 		return nil, fmt.Errorf("reusability analyze: %w", err)
 	}
 
-	return groupByPackage(policydomain.Evaluate(report, policy)), nil
+	return groupByPackage(policydomain.Evaluate(report, rules)), nil
 }
 
 func groupByPackage(violations []policydomain.Violation) map[string][]policydomain.Violation {
@@ -131,13 +132,5 @@ func groupByPackage(violations []policydomain.Violation) map[string][]policydoma
 }
 
 func violationPos(pass *analysis.Pass, v policydomain.Violation) token.Pos {
-	if v.Function != "" {
-		return exactFuncPos(pass, v.Type, v.Function)
-	}
-
-	if v.Type != "" {
-		return typePos(pass, v.Type)
-	}
-
-	return structuralPos(pass, v.Key)
+	return typePos(pass, v.Type)
 }

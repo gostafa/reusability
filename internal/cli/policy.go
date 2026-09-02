@@ -8,37 +8,36 @@ import (
 	policydomain "github.com/gostafa/reusability/internal/features/policy/domain"
 )
 
-// override is one CLI policy bound: a condition key and its numeric value.
-// Metric keys may be the reported metric ("reusability") or scoped
-// ("type.reusability").
-type override struct {
-	key   string
-	value float64
+// ruleSpec is one CLI policy rule: a package-path pattern and its minimum
+// reusability threshold.
+type ruleSpec struct {
+	pattern string
+	min     float64
 }
 
-// overrideList collects repeated -max / -min flags. It implements flag.Value.
-type overrideList struct {
-	items []override
+// ruleList collects repeated -rule flags. It implements flag.Value.
+type ruleList struct {
+	items []ruleSpec
 }
 
-func (o *overrideList) String() string {
-	parts := make([]string, len(o.items))
-	for i, ov := range o.items {
-		parts[i] = ov.key + "=" + strconv.FormatFloat(ov.value, 'g', -1, 64)
+func (r *ruleList) String() string {
+	parts := make([]string, len(r.items))
+	for i, spec := range r.items {
+		parts[i] = spec.pattern + ":" + strconv.FormatFloat(spec.min, 'g', -1, 64)
 	}
 
 	return strings.Join(parts, ",")
 }
 
-func (o *overrideList) Set(value string) error {
-	key, number, ok := strings.Cut(value, "=")
+func (r *ruleList) Set(value string) error {
+	pattern, number, ok := strings.Cut(value, ":")
 	if !ok {
-		return fmt.Errorf("expected key=value, got %q", value)
+		return fmt.Errorf("expected pattern:min, got %q", value)
 	}
 
-	key = strings.TrimSpace(key)
-	if key == "" {
-		return fmt.Errorf("empty key in %q", value)
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return fmt.Errorf("empty pattern in %q", value)
 	}
 
 	parsed, err := strconv.ParseFloat(strings.TrimSpace(number), 64)
@@ -46,49 +45,28 @@ func (o *overrideList) Set(value string) error {
 		return fmt.Errorf("invalid number in %q: %w", value, err)
 	}
 
-	o.items = append(o.items, override{key: key, value: parsed})
+	r.items = append(r.items, ruleSpec{pattern: pattern, min: parsed})
 
 	return nil
 }
 
-// resolvePolicy builds a policy from explicit CLI thresholds only. It returns
-// a human-readable source label so the CLI can say which policy ran, and the
-// validated policy.
-func resolvePolicy(
-	maxima, minima overrideList,
-) (policydomain.Policy, string, error) {
-	if len(maxima.items) == 0 && len(minima.items) == 0 {
-		return policydomain.Policy{}, "", fmt.Errorf(
-			"no policy thresholds configured; pass -max or -min",
+// resolvePolicy builds rules from explicit CLI -rule flags. It returns a
+// human-readable source label and the validated rules.
+func resolvePolicy(rules ruleList) ([]policydomain.Rule, string, error) {
+	if len(rules.items) == 0 {
+		return nil, "", fmt.Errorf(
+			"no policy rules configured; pass at least one -rule=pattern:min with -check",
 		)
 	}
 
-	var policy policydomain.Policy
-	for _, ov := range maxima.items {
-		if err := policydomain.ApplyOverride(
-			&policy,
-			ov.key,
-			policydomain.ComparatorMax,
-			ov.value,
-		); err != nil {
-			return policydomain.Policy{}, "", err
-		}
+	out := make([]policydomain.Rule, len(rules.items))
+	for i, spec := range rules.items {
+		out[i] = policydomain.Rule{Pattern: spec.pattern, Min: spec.min}
 	}
 
-	for _, ov := range minima.items {
-		if err := policydomain.ApplyOverride(
-			&policy,
-			ov.key,
-			policydomain.ComparatorMin,
-			ov.value,
-		); err != nil {
-			return policydomain.Policy{}, "", err
-		}
+	if err := policydomain.Validate(out); err != nil {
+		return nil, "", err
 	}
 
-	if err := policydomain.Validate(policy); err != nil {
-		return policydomain.Policy{}, "", err
-	}
-
-	return policy, "flag thresholds", nil
+	return out, "flag rules", nil
 }

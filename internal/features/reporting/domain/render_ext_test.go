@@ -36,8 +36,8 @@ func TestTextAndCSVRendering(t *testing.T) {
 		Packages: []reusability.PackageReport{
 			{
 				Path: "example.com/m/a",
-				Types: []reusability.TypeReport{{Name: "A", Metrics: []metrics.MetricResult{
-					{Name: "reusability", Scope: metrics.ScopeType, Value: 0.7, Applicable: true},
+				Types: []reusability.TypeReport{{Name: "A", Reusability: metrics.MetricResult{
+					Name: "reusability", Scope: metrics.ScopeType, Value: 0.7, Applicable: true,
 				}}},
 			},
 		},

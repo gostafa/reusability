@@ -1,6 +1,8 @@
 # reusability
 
-`reusability` analyzes Go named types and reports the **reusability index**.
+`reusability` analyzes Go named types and reports the **reusability index** per
+type. Reports show only package path, type name, and reusability — no structural
+metadata (fields, methods, coupling counts, etc.).
 Supporting type-level metrics (AMC, LCOM, TCC, CBO) and cyclomatic complexity
 are computed internally and are not reported, selectable, or gateable on their
 own.
@@ -34,8 +36,11 @@ reusability
 # Open the HTML report.
 # reusability --web ./...
 
-# Fail when policy limits are violated.
-# reusability --max=types=12 --min=type.reusability=0.7 ./...
+# Fail when policy rules are violated.
+# reusability --check \
+#   --rule='**/internal/**':0.8 \
+#   --rule='**':0.6 \
+#   ./...
 ```
 
 Flags must come before package patterns:
@@ -53,10 +58,16 @@ Useful flags:
 * `--dependency-scope=project|module|all`
 * `--field-usage=direct|transitive`
 * `--continue-on-error`
-* `--max=key=value` and `--min=key=value`
+* `--check` with `--rule=pattern:min` (repeatable; requires `--check`)
 
-The reported metric is `reusability`. A config naming a hidden input (`lcom`,
-`amc`, `tcc`, `cbo`) is rejected as an unknown policy metric.
+Policy gates type-level reusability by package import path. Example:
+
+```bash
+reusability --check \
+  --rule='**/internal/**':0.8 \
+  --rule='**':0.6 \
+  ./...
+```
 
 ### Build from source
 
@@ -106,12 +117,11 @@ linters:
           dependency-scope: module
           field-usage: direct
 
-          type:
-            methods:
-              max: 10
-            metrics:
-              reusability:
-                min: 0.7
+          rules:
+            - pattern: "**/internal/**"
+              min: 0.8
+            - pattern: "**"
+              min: 0.6
 ```
 
 Build and run the custom linter:

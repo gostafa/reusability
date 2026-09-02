@@ -24,26 +24,8 @@ func TestAssembleOrderingAndIDs(t *testing.T) {
 			Imports: []string{"fmt", "example.com/m/alpha", "fmt", "example.com/m/zeta"},
 		},
 		{
-			Path:       "example.com/m/alpha",
-			InModule:   true,
-			VarCount:   4,
-			ConstCount: 5,
-			Variables: []domain.DeclarationFacts{{
-				Name:     "AlphaVar",
-				Exported: true,
-				Pos:      domain.Position{File: "alpha/a.go", Line: 3, Column: 5},
-			}},
-			Constants: []domain.DeclarationFacts{{
-				Name: "alphaConst",
-				Pos:  domain.Position{File: "alpha/a.go", Line: 4, Column: 7},
-			}},
-			Functions: []domain.FunctionFacts{{
-				Name:     "AlphaFunc",
-				Exported: true,
-				Pos:      domain.Position{File: "alpha/a.go", Line: 6, Column: 1},
-				Lines:    3,
-				Branches: domain.BranchStats{Ifs: 1},
-			}},
+			Path:     "example.com/m/alpha",
+			InModule: true,
 			Types: []domain.TypeExtract{{
 				Name: "A",
 				Fields: []domain.FieldFacts{{
@@ -69,14 +51,6 @@ func TestAssembleOrderingAndIDs(t *testing.T) {
 
 	if len(facts.Packages) != 2 || facts.Packages[0].Path != "example.com/m/alpha" {
 		t.Fatalf("packages not sorted by path: %+v", facts.Packages)
-	}
-	if facts.Packages[0].VarCount != 4 || facts.Packages[0].ConstCount != 5 {
-		t.Fatalf("alpha counts = vars %d consts %d, want 4 and 5",
-			facts.Packages[0].VarCount, facts.Packages[0].ConstCount)
-	}
-	if facts.Packages[0].Variables[0].Name != "AlphaVar" ||
-		facts.Packages[0].Functions[0].Lines != 3 {
-		t.Fatalf("alpha declaration details = %+v", facts.Packages[0])
 	}
 
 	for i, pkg := range facts.Packages {

@@ -92,16 +92,16 @@ func TestJSONDebugStringsAndMarshalError(t *testing.T) {
 		t.Fatalf("jsonPackage.String() = %q", packageSummary)
 	}
 
-	_, err := encodeOrderedMetrics([]metrics.MetricResult{{
-		Name:       metrics.MetricReusability,
-		Scope:      metrics.ScopeType,
-		Value:      math.NaN(),
+	_, err := jsonMarshal(jsonMetric{
 		Applicable: true,
-	}})
+		Value:      ptrFloat(math.NaN()),
+	})
 	if err == nil {
 		t.Fatal("expected JSON encoding to reject NaN")
 	}
 }
+
+func ptrFloat(v float64) *float64 { return &v }
 
 func TestWriteDocsErrors(t *testing.T) {
 	sentinel := errors.New("open failed")
@@ -166,10 +166,10 @@ func TestRenderCSVWriteErrors(t *testing.T) {
 	for i := 0; i < 200; i++ {
 		pkg.Types = append(pkg.Types, reusability.TypeReport{
 			Name: fmt.Sprintf("T%d", i),
-			Metrics: []metrics.MetricResult{{
-				Name: metrics.MetricAMC, Scope: metrics.ScopeType, Value: float64(i),
+			Reusability: metrics.MetricResult{
+				Name: metrics.MetricReusability, Scope: metrics.ScopeType, Value: float64(i),
 				Applicable: true, Definition: "d", Reason: strings.Repeat("x", 64),
-			}},
+			},
 		})
 	}
 	big.Packages[0] = pkg
@@ -200,10 +200,8 @@ func TestJSONMarshalSeamErrors(t *testing.T) {
 	if err := renderWeb(io.Discard, sampleReport()); !errors.Is(err, sentinel) {
 		t.Fatalf("renderWeb = %v, want sentinel", err)
 	}
-	if _, err := encodeOrderedMetrics([]metrics.MetricResult{{
-		Name: metrics.MetricAMC, Scope: metrics.ScopeType, Value: 1, Applicable: true,
-	}}); !errors.Is(err, sentinel) {
-		t.Fatalf("encodeOrderedMetrics = %v, want sentinel", err)
+	if _, err := jsonMarshal(buildJSONReport(sampleReport())); !errors.Is(err, sentinel) {
+		t.Fatalf("buildJSONReport marshal = %v, want sentinel", err)
 	}
 }
 

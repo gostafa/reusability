@@ -26,16 +26,12 @@ func tableReport() reusability.Report {
 		Packages: []reusability.PackageReport{{
 			Path: "example.com/mod",
 			Types: []reusability.TypeReport{
-				{Name: "Cart", Metrics: []metrics.MetricResult{
-					typeMetric(metrics.MetricReusability, 0.80),
-				}},
-				{Name: "Order", Metrics: []metrics.MetricResult{
-					{
-						Name:       metrics.MetricReusability,
-						Scope:      metrics.ScopeType,
-						Applicable: false,
-						Reason:     "every component dropped",
-					},
+				{Name: "Cart", Reusability: typeMetric(metrics.MetricReusability, 0.80)},
+				{Name: "Order", Reusability: metrics.MetricResult{
+					Name:       metrics.MetricReusability,
+					Scope:      metrics.ScopeType,
+					Applicable: false,
+					Reason:     "every component dropped",
 				}},
 			},
 		}},
@@ -54,8 +50,8 @@ func TestTextTreeTableLayout(t *testing.T) {
 	got := Text(tableReport(), TextOptions{})
 
 	mustMatch(t, got, `(?m)^module example\.com/mod$`)
-	mustMatch(t, got, `(?m)^PATH / TYPE\s+Funcs\s+Vars\s+Consts\s+Types\s+Reuse$`)
-	mustMatch(t, got, `(?m)^\.\s+0\s+0\s+0\s+2\s+0\.80$`)
+	mustMatch(t, got, `(?m)^PATH / TYPE\s+Reuse$`)
+	mustMatch(t, got, `(?m)^\.\s+0\.80$`)
 	mustMatch(t, got, `(?m)^├── Cart\s+0\.80$`)
 	mustMatch(t, got, `(?m)^└── Order\s+–$`)
 	mustMatch(t, got, `(?m)^– = not applicable$`)
@@ -75,24 +71,24 @@ func TestTextTreeGroupsPackagesUnderSharedPath(t *testing.T) {
 		{
 			Path: "example.com/mod/internal/a",
 			Types: []reusability.TypeReport{
-				{Name: "T1", Metrics: []metrics.MetricResult{typeMetric(metrics.MetricReusability, 0.5)}},
+				{Name: "T1", Reusability: typeMetric(metrics.MetricReusability, 0.5)},
 			},
 		},
 		{
 			Path: "example.com/mod/internal/b/deep",
 			Types: []reusability.TypeReport{
-				{Name: "T2", Metrics: []metrics.MetricResult{typeMetric(metrics.MetricReusability, 1)}},
+				{Name: "T2", Reusability: typeMetric(metrics.MetricReusability, 1)},
 			},
 		},
 	}
 
 	got := Text(report, TextOptions{})
 
-	mustMatch(t, got, `(?m)^internal\s+0\s+0\s+0\s+2\s+0\.75$`)
-	mustMatch(t, got, `(?m)^├── a\s+0\s+0\s+0\s+1\s+0\.50$`)
+	mustMatch(t, got, `(?m)^internal\s+0\.75$`)
+	mustMatch(t, got, `(?m)^├── a\s+0\.50$`)
 	mustMatch(t, got, `(?m)^│   └── T1\s+0\.50$`)
 	mustMatch(t, got, `(?m)^│$`)
-	mustMatch(t, got, `(?m)^└── b/deep\s+0\s+0\s+0\s+1\s+1\.00$`)
+	mustMatch(t, got, `(?m)^└── b/deep\s+1\.00$`)
 	mustMatch(t, got, `(?m)^    └── T2\s+1\.00$`)
 }
 

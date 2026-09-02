@@ -10,18 +10,14 @@ import (
 
 // formatViolation renders one policy violation as a diagnostic message.
 func formatViolation(v policydomain.Violation) string {
-	where := v.Package + " (package)"
-	if v.Type != "" {
-		where = v.Package + "." + v.Type + " (type)"
-	}
+	where := v.Package + "." + v.Type + " (type)"
 
-	relation := "exceeds max"
-	if v.Comparator == policydomain.ComparatorMin {
-		relation = "is below min"
-	}
-
-	return fmt.Sprintf("%s: %s %s %s %s",
-		where, v.Key, formatNumber(v.Value), relation, formatNumber(v.Threshold))
+	return fmt.Sprintf("%s: reusability %s is below min %s (rule %s)",
+		where,
+		formatNumber(v.Value),
+		formatNumber(v.Threshold),
+		v.Rule,
+	)
 }
 
 func formatNumber(value float64) string {

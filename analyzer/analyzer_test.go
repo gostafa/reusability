@@ -4,8 +4,10 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	policydomain "github.com/gostafa/reusability/internal/features/policy/domain"
@@ -42,6 +44,12 @@ func TestNewRejectsInvalidSettings(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for all-zero reusability weights")
 	}
+
+	min := 1.5
+	_, err = New(Settings{Rules: []RuleSettings{{Pattern: "**", Min: &min}}})
+	if err == nil {
+		t.Fatal("expected error for invalid rule min")
+	}
 }
 
 func TestNewAcceptsDefaults(t *testing.T) {
@@ -59,12 +67,12 @@ func TestNewAcceptsDefaults(t *testing.T) {
 
 func TestRunnerLoadGroupsViolations(t *testing.T) {
 	fixtureDir := filepath.Join(repoRoot(t), "testdata", "fixture")
-	methods := maximum(0)
+	min := 0.99
 
 	r := newRunner(Settings{
 		Directory: fixtureDir,
 		Patterns:  []string{"./isolated"},
-		Type:      &TypeSettings{Methods: &methods},
+		Rules:     []RuleSettings{{Pattern: "**", Min: &min}},
 	}.withDefaults())
 
 	r.load()
@@ -74,27 +82,19 @@ func TestRunnerLoadGroupsViolations(t *testing.T) {
 
 	got := r.byPkg["example.com/fixture/isolated"]
 	if len(got) == 0 {
-		t.Fatal("expected violations for isolated with methods max: 0")
+		t.Fatal("expected reusability violations for isolated with min 0.99")
 	}
 
-	foundMethods := false
+	found := false
 	for _, v := range got {
-		if v.Key == policydomain.KeyMethods && v.Type == "Value" {
-			foundMethods = true
+		if v.Type == "Value" && v.Rule == "**" {
+			found = true
 		}
 	}
 
-	if !foundMethods {
-		t.Fatalf("expected methods violation on Value, got %#v", got)
+	if !found {
+		t.Fatalf("expected reusability violation on Value, got %#v", got)
 	}
-}
-
-func maximum(value float64) LimitSettings {
-	return LimitSettings{Max: &value}
-}
-
-func maximumFunc(value float64) FuncSettings {
-	return FuncSettings{Max: &value}
 }
 
 func ptr(value float64) *float64 {
@@ -142,15 +142,14 @@ func TestFormatViolation(t *testing.T) {
 	t.Parallel()
 
 	msg := formatViolation(policydomain.Violation{
-		Package:    "example.com/p",
-		Type:       "T",
-		Key:        "methods",
-		Value:      3,
-		Comparator: policydomain.ComparatorMax,
-		Threshold:  0,
+		Package:   "example.com/p",
+		Type:      "T",
+		Value:     0.55,
+		Threshold: 0.8,
+		Rule:      "**/internal/**",
 	})
 
-	want := "example.com/p.T (type): methods 3 exceeds max 0"
+	want := "example.com/p.T (type): reusability 0.55 is below min 0.80 (rule **/internal/**)"
 	if msg != want {
 		t.Fatalf("formatViolation = %q, want %q", msg, want)
 	}
@@ -161,12 +160,7 @@ func TestTypePosAndPackagePos(t *testing.T) {
 
 	src := `package p
 
-const C = 1
-var V int
-func helper() {}
-func Exported() {}
 type Widget struct{}
-func (Widget) Do() {}
 `
 	fset := token.NewFileSet()
 
@@ -188,64 +182,6 @@ func (Widget) Do() {}
 	if pos := packagePos(pass); pos != file.Package {
 		t.Fatalf("packagePos = %v, want %v", pos, file.Package)
 	}
-
-	positionCases := map[string]string{
-		policydomain.KeyFuncs:           "helper",
-		policydomain.KeyExportedFuncs:   "Exported",
-		policydomain.KeyUnexportedFuncs: "helper",
-		policydomain.KeyVars:            "V",
-		policydomain.KeyConsts:          "C",
-	}
-	for key, ident := range positionCases {
-		want := identPos(t, file, ident)
-		if pos := structuralPos(pass, key); pos != want {
-			t.Fatalf("structuralPos(%q) = %v, want %v", key, pos, want)
-		}
-	}
-
-	for _, tc := range []struct {
-		receiver string
-		name     string
-	}{
-		{"", "helper"},
-		{"Widget", "Do"},
-	} {
-		want := identPos(t, file, tc.name)
-		if pos := exactFuncPos(pass, tc.receiver, tc.name); pos != want {
-			t.Fatalf("exactFuncPos(%q, %q) = %v, want %v",
-				tc.receiver,
-				tc.name,
-				pos,
-				want,
-			)
-		}
-	}
-}
-
-func identPos(t *testing.T, file *ast.File, name string) token.Pos {
-	t.Helper()
-
-	var pos token.Pos
-	ast.Inspect(file, func(n ast.Node) bool {
-		if pos != token.NoPos {
-			return false
-		}
-
-		ident, ok := n.(*ast.Ident)
-		if !ok || ident.Name != name {
-			return true
-		}
-
-		pos = ident.Pos()
-
-		return false
-	})
-
-	if pos == token.NoPos {
-		t.Fatalf("identifier %q not found", name)
-	}
-
-	return pos
 }
 
 func repoRoot(t *testing.T) string {
@@ -257,4 +193,59 @@ func repoRoot(t *testing.T) string {
 	}
 
 	return filepath.Clean(filepath.Join(filepath.Dir(file), ".."))
+}
+
+func TestViolationPosUsesType(t *testing.T) {
+	t.Parallel()
+
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "p.go", "package p\n\ntype Widget struct{}\n", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pass := &analysis.Pass{Files: []*ast.File{file}, Fset: fset}
+	pos := violationPos(pass, policydomain.Violation{Type: "Widget"})
+	if pos == token.NoPos {
+		t.Fatal("violationPos = NoPos")
+	}
+}
+
+func TestRunnerRunReportsTypeViolations(t *testing.T) {
+	t.Parallel()
+
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "p.go", "package p\n\ntype Widget struct{}\n", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := &runner{byPkg: map[string][]policydomain.Violation{
+		"example.com/p": {{
+			Package:   "example.com/p",
+			Type:      "Widget",
+			Value:     0.5,
+			Threshold: 0.8,
+			Rule:      "**",
+		}},
+	}}
+	r.once.Do(func() {})
+
+	var diagnostics []analysis.Diagnostic
+	pass := &analysis.Pass{
+		Fset:   fset,
+		Files:  []*ast.File{file},
+		Pkg:    types.NewPackage("example.com/p", "p"),
+		Report: func(d analysis.Diagnostic) { diagnostics = append(diagnostics, d) },
+	}
+
+	if _, err := r.run(pass); err != nil {
+		t.Fatal(err)
+	}
+	if len(diagnostics) != 1 {
+		t.Fatalf("diagnostics = %#v, want one", diagnostics)
+	}
+	if !strings.Contains(diagnostics[0].Message, "is below min 0.8") {
+		t.Errorf("diagnostic = %q", diagnostics[0].Message)
+	}
 }

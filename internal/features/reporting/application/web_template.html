@@ -183,7 +183,6 @@
     <input type="search" id="q" placeholder="Filter packages…  ( / )" aria-label="filter packages">
     <select id="pkg-filter" aria-label="package filter"></select>
     <label class="check" id="hide-na-label"><input type="checkbox" id="hide-na"> hide n/a types</label>
-    <button class="btn" id="col-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="col-sheet">Columns</button>
     <div class="lvl" id="levels">
       <span class="lvl-label" id="lvl-label">depth</span>
       <div class="pills" id="level-pills" role="group" aria-labelledby="lvl-label"></div>
@@ -193,12 +192,6 @@
   </nav>
 
   <main id="table-view">
-    <div class="tablebar">
-      <span class="lvl-label" id="kind-label">show</span>
-      <div class="kindbar" id="kind-pills" role="group" aria-labelledby="kind-label"></div>
-      <span class="lvl-label" id="export-label">names</span>
-      <div class="kindbar" id="export-pills" role="group" aria-labelledby="export-label"></div>
-    </div>
     <div class="tablewrap">
       <table id="report-table" aria-label="package report table">
         <thead id="report-head"></thead>
@@ -209,7 +202,6 @@
 
   <footer id="foot"></footer>
 </div>
-<div class="sheet" id="col-sheet" hidden></div>
 
 <script>
 (function () {
@@ -219,46 +211,14 @@
   var docsPayload = JSON.parse(document.getElementById('docs-data').textContent);
   var modulePath = payload.module || '';
   var report = payload.report || { packages: [] };
-  var TYPE_ORDER = ['amc', 'lcom', 'tcc', 'cbo', 'reusability'];
-  var PKG_ORDER = ['abstractness', 'instability', 'distance'];
-  var DETAIL_KINDS = [
-    { key: 'packages', label: 'Packages' },
-    { key: 'types', label: 'Types' },
-    { key: 'functions', label: 'Funcs' },
-    { key: 'variables', label: 'Vars' },
-    { key: 'constants', label: 'Consts' }
-  ];
-  var EXPORT_MODES = [
-    { key: 'all', label: 'All' },
-    { key: 'exported', label: 'Exported' }
-  ];
-  var META = {
-    amc: { label: 'AMC', full: 'Average Method Complexity', bounded: false },
-    lcom: { label: 'LCOM', full: 'Lack of Cohesion', bounded: true },
-    tcc: { label: 'TCC', full: 'Tight Class Cohesion', bounded: true },
-    cbo: { label: 'CBO', full: 'Coupling Between Objects', bounded: false },
-    reusability: { label: 'Reuse', full: 'Experimental Reusability Index', bounded: true },
-    abstractness: { label: 'Abst', full: 'Abstractness', bounded: true },
-    instability: { label: 'Inst', full: 'Instability', bounded: true },
-    distance: { label: 'Dist', full: 'Distance from Main Sequence', bounded: true }
-  };
+  var TYPE_COL = 'reusability';
   var FIELD_HELP = {
-    tree: 'The package tree. In declaration views, package rows provide context and child rows show the selected names.',
-    kind: 'The underlying kind of a named type, such as struct, interface, alias, or other.',
-    exported: 'Whether the name is exported from its package. Exported Go names start with an uppercase letter.',
-    lines: 'The inclusive source line count for the function body, from the func declaration through its end.',
-    cyclomatic: 'Cyclomatic complexity for the function: the number of independent control-flow paths through it.'
+    tree: 'The package tree. Package rows summarize the subtree; type rows show each named type.',
+    reusability: 'Experimental Reusability Index — a composite of cohesion, coupling, testability, and documentation.'
   };
   var docsByName = {};
   (docsPayload.docs || []).forEach(function (d) { docsByName[d.name] = d; });
-  var QUALITY = {
-    tcc: { bounded: true },
-    reusability: { bounded: true },
-    lcom: { lowerBetter: true, bounded: true },
-    distance: { lowerBetter: true, bounded: true },
-    amc: { lowerBetter: true },
-    cbo: { lowerBetter: true }
-  };
+  var QUALITY = { reusability: { bounded: true } };
 
   function el(tag, attrs, text) {
     var n = document.createElement(tag);
@@ -276,20 +236,12 @@
     return path;
   }
   function fmt(v) { return Number(v).toFixed(2); }
-  function meta(c) { return META[c] || { label: c.toUpperCase(), full: c, bounded: false }; }
+  function meta(c) { return { label: 'Reuse', full: 'Experimental Reusability Index', bounded: true }; }
   function helpForColumn(col) {
-    var key = col.metric || col.key;
     if (col.tree) return FIELD_HELP.tree;
-    var doc = docsByName[key];
+    var doc = docsByName[TYPE_COL];
     if (doc) return doc.full_name + ': ' + doc.summary;
-    return FIELD_HELP[key] || col.label;
-  }
-  function columnsOf(list, order) {
-    var present = {};
-    list.forEach(function (m) { Object.keys(m || {}).forEach(function (k) { present[k] = true; }); });
-    var out = order.filter(function (k) { return present[k]; });
-    Object.keys(present).sort().forEach(function (k) { if (order.indexOf(k) < 0) out.push(k); });
-    return out;
+    return FIELD_HELP.reusability;
   }
   function includes(text, query) {
     return String(text || '').toLowerCase().indexOf(query) >= 0;
@@ -299,24 +251,11 @@
     return {
       path: p.path,
       rel: relPath(p.path),
-      ca: p.afferent || 0,
-      ce: p.efferent || 0,
-      funcs: p.funcs || 0,
-      vars: p.vars || 0,
-      consts: p.consts || 0,
-      variables: p.variables || [],
-      constants: p.constants || [],
-      functions: p.functions || [],
-      metrics: p.metrics || {},
       types: (p.types || []).map(function (t) {
         return {
           pkg: null,
           name: t.name,
-          exported: !!t.exported,
-          kind: t.kind || 'other',
-          fields: t.fields || 0,
-          methods: t.methods || 0,
-          metrics: t.metrics || {}
+          reusability: t.reusability || {}
         };
       })
     };
@@ -324,34 +263,21 @@
   packages.forEach(function (p) { p.types.forEach(function (t) { t.pkg = p; }); });
   var typeRows = [];
   packages.forEach(function (p) { p.types.forEach(function (t) { typeRows.push(t); }); });
-  var typeCols = columnsOf(typeRows.map(function (t) { return t.metrics; }), TYPE_ORDER);
-  var pkgCols = columnsOf(packages.map(function (p) { return p.metrics; }), PKG_ORDER);
-  var colRange = {};
-  typeCols.forEach(function (c) {
-    var mn = Infinity, mx = -Infinity;
-    typeRows.forEach(function (t) {
-      var m = t.metrics[c];
-      if (m && m.applicable) { mn = Math.min(mn, m.value); mx = Math.max(mx, m.value); }
-    });
-    colRange[c] = { min: mn, max: mx };
-  });
-  function qualityClass(col, value) {
-    var q = QUALITY[col];
-    if (!q) return '';
-    var score;
-    if (q.bounded) score = Math.max(0, Math.min(1, value));
-    else {
-      var r = colRange[col];
-      if (!r || r.max === r.min || r.min === Infinity) return '';
-      score = (value - r.min) / (r.max - r.min);
+  var colRange = { min: Infinity, max: -Infinity };
+  typeRows.forEach(function (t) {
+    var m = t.reusability;
+    if (m && m.applicable) {
+      colRange.min = Math.min(colRange.min, m.value);
+      colRange.max = Math.max(colRange.max, m.value);
     }
-    if (q.lowerBetter) score = 1 - score;
+  });
+  function qualityClass(value) {
+    var q = QUALITY.reusability;
+    var score = Math.max(0, Math.min(1, value));
     return score >= 0.66 ? 'q-good' : score >= 0.33 ? 'q-warn' : 'q-bad';
   }
-  function frac(col, value) {
-    if (meta(col).bounded) return Math.max(0, Math.min(1, value));
-    var r = colRange[col];
-    return r && r.max > 0 ? Math.max(0, Math.min(1, value / r.max)) : 0;
+  function frac(value) {
+    return Math.max(0, Math.min(1, value));
   }
 
   function dirNode(name, path) {
@@ -409,10 +335,7 @@
   var state = {
     q: '',
     pkg: '',
-    detail: 'types',
-    exportMode: 'all',
     hideNA: false,
-    hidden: {},
     collapsed: {},
     level: 'all',
     sort: { key: 'tree', dir: 'asc' }
@@ -420,38 +343,19 @@
 
   function visibleType(t) {
     if (!state.hideNA) return true;
-    return typeCols.filter(function (c) { return !state.hidden[c]; }).every(function (c) {
-      var m = t.metrics[c];
-      return m && m.applicable;
-    });
-  }
-  function visibleExported(row) {
-    return state.exportMode !== 'exported' || row.exported;
+    var m = t.reusability;
+    return m && m.applicable;
   }
   function detailRows(pkg) {
-    if (state.detail === 'packages') return [];
-    if (state.detail === 'variables') {
-      return pkg.variables.map(function (d) { return { kind: 'variable', pkg: pkg, item: d, name: d.name, exported: !!d.exported }; }).filter(visibleExported);
-    }
-    if (state.detail === 'constants') {
-      return pkg.constants.map(function (d) { return { kind: 'constant', pkg: pkg, item: d, name: d.name, exported: !!d.exported }; }).filter(visibleExported);
-    }
-    if (state.detail === 'functions') {
-      return pkg.functions.map(function (f) {
-        return { kind: 'function', pkg: pkg, item: f, name: f.name, exported: !!f.exported, lines: f.lines || 0, cyclomatic: f.cyclomatic || 0 };
-      }).filter(visibleExported);
-    }
     return pkg.types.filter(visibleType).map(function (t) {
       return {
-        kind: 'type', pkg: pkg, item: t, name: t.name, itemKind: t.kind,
-        exported: !!t.exported, fields: t.fields || 0,
-        methods: t.methods || 0, metrics: t.metrics || {}
+        kind: 'type', pkg: pkg, name: t.name,
+        reusability: t.reusability || {}
       };
-    }).filter(visibleExported);
+    });
   }
   function rowSearch(row) {
-    var parts = [row.pkg.path, row.pkg.rel, row.name, row.kind, row.itemKind || ''];
-    return parts.join(' ');
+    return [row.pkg.path, row.pkg.rel, row.name].join(' ');
   }
   function packageMatches(pkg) {
     return !state.q || includes(pkg.path + ' ' + pkg.rel, state.q);
@@ -479,75 +383,28 @@
       pkgCopy.children = kids;
       pkgCopy.details = rows;
       pkgCopy.includePackage = pkgMatches;
-      pkgCopy.showEmpty = state.detail !== 'packages' && pkgMatches && !rows.length;
+      pkgCopy.showEmpty = pkgMatches && !rows.length;
       return pkgCopy;
     }
     return null;
   }
 
   function activeColumns() {
-    var cols = [{ key: 'tree', label: state.detail === 'packages' ? 'Package' : 'Package / Name', type: 'text', tree: true }];
-    if (state.detail === 'packages') {
-      cols = cols.concat([
-        { key: 'funcs', label: 'Funcs', type: 'number', pkg: true },
-        { key: 'vars', label: 'Vars', type: 'number', pkg: true },
-        { key: 'consts', label: 'Consts', type: 'number', pkg: true },
-        { key: 'types', label: 'Types', type: 'number', pkg: true },
-        { key: 'ca', label: 'Ca', type: 'number', pkg: true },
-        { key: 'ce', label: 'Ce', type: 'number', pkg: true }
-      ]);
-      pkgCols.forEach(function (c) {
-        if (!state.hidden[c]) cols.push({ key: 'pkg:' + c, metric: c, label: meta(c).label, title: meta(c).full, type: 'number', pkgMetric: true });
-      });
-      return cols;
-    }
-    if (state.detail === 'types') {
-      cols = cols.concat([
-        { key: 'kind', label: 'Kind', type: 'text', item: true },
-        { key: 'exported', label: 'Exported', type: 'boolean', item: true },
-        { key: 'fields', label: 'Fields', type: 'number', item: true },
-        { key: 'methods', label: 'Methods', type: 'number', item: true }
-      ]);
-      typeCols.forEach(function (c) {
-        if (!state.hidden[c]) cols.push({ key: 'type:' + c, metric: c, label: meta(c).label, title: meta(c).full, type: 'number', typeMetric: true });
-      });
-    } else if (state.detail === 'functions') {
-      cols = cols.concat([
-        { key: 'exported', label: 'Exported', type: 'boolean', item: true },
-        { key: 'lines', label: 'Lines', type: 'number', item: true },
-        { key: 'cyclomatic', label: 'Cyclo', type: 'number', item: true }
-      ]);
-    } else {
-      cols = cols.concat([
-        { key: 'exported', label: 'Exported', type: 'boolean', item: true }
-      ]);
-    }
-    return cols;
+    return [
+      { key: 'tree', label: 'Package / Type', type: 'text', tree: true },
+      { key: 'reusability', label: 'Reuse', title: 'Experimental Reusability Index', type: 'number' }
+    ];
   }
-  function metricValue(metrics, name) {
-    var m = metrics && metrics[name];
+  function metricValue(m) {
     return m && m.applicable ? m.value : null;
   }
   function emptySummary() {
-    return {
-      pkgCount: 0, funcs: 0, vars: 0, consts: 0, types: 0, ca: 0, ce: 0,
-      pkgMetrics: {}, details: 0, exported: 0,
-      fields: { sum: 0, count: 0 },
-      methods: { sum: 0, count: 0 },
-      lines: { sum: 0, count: 0 },
-      cyclomatic: { sum: 0, count: 0 },
-      typeMetrics: {}
-    };
+    return { pkgCount: 0, types: 0, details: 0, reuse: { sum: 0, count: 0 } };
   }
   function addStat(stat, value) {
     if (value === null || value === undefined || value === '') return;
     stat.sum += Number(value);
     stat.count++;
-  }
-  function addMetricStat(stats, name, value) {
-    if (value === null || value === undefined) return;
-    if (!stats[name]) stats[name] = { sum: 0, count: 0 };
-    addStat(stats[name], value);
   }
   function meanStat(stat) {
     return stat && stat.count ? stat.sum / stat.count : null;
@@ -556,50 +413,19 @@
     dst.sum += src.sum;
     dst.count += src.count;
   }
-  function mergeMetricStats(dst, src) {
-    Object.keys(src).forEach(function (name) {
-      if (!dst[name]) dst[name] = { sum: 0, count: 0 };
-      mergeStat(dst[name], src[name]);
-    });
-  }
   function addPackageSummary(summary, pkg) {
     summary.pkgCount++;
-    summary.funcs += pkg.funcs;
-    summary.vars += pkg.vars;
-    summary.consts += pkg.consts;
     summary.types += pkg.types.length;
-    summary.ca += pkg.ca;
-    summary.ce += pkg.ce;
-    pkgCols.forEach(function (name) { addMetricStat(summary.pkgMetrics, name, metricValue(pkg.metrics, name)); });
   }
   function addDetailSummary(summary, row) {
     summary.details++;
-    if (row.exported) summary.exported++;
-    if (row.kind === 'type') {
-      addStat(summary.fields, row.fields);
-      addStat(summary.methods, row.methods);
-      typeCols.forEach(function (name) { addMetricStat(summary.typeMetrics, name, metricValue(row.metrics, name)); });
-    } else if (row.kind === 'function') {
-      addStat(summary.lines, row.lines);
-      addStat(summary.cyclomatic, row.cyclomatic);
-    }
+    addStat(summary.reuse, metricValue(row.reusability));
   }
   function mergeSummary(dst, src) {
     dst.pkgCount += src.pkgCount;
-    dst.funcs += src.funcs;
-    dst.vars += src.vars;
-    dst.consts += src.consts;
     dst.types += src.types;
-    dst.ca += src.ca;
-    dst.ce += src.ce;
     dst.details += src.details;
-    dst.exported += src.exported;
-    mergeStat(dst.fields, src.fields);
-    mergeStat(dst.methods, src.methods);
-    mergeStat(dst.lines, src.lines);
-    mergeStat(dst.cyclomatic, src.cyclomatic);
-    mergeMetricStats(dst.pkgMetrics, src.pkgMetrics);
-    mergeMetricStats(dst.typeMetrics, src.typeMetrics);
+    mergeStat(dst.reuse, src.reuse);
   }
   function summarizeNode(n) {
     var summary = emptySummary();
@@ -611,40 +437,16 @@
     n.summary = summary;
     return summary;
   }
-  function aggregateMetricValue(stats, name) {
-    return meanStat(stats && stats[name]);
-  }
   function valueForTreeNode(n, key) {
     if (key === 'tree') return n.label;
     var summary = n.summary;
     if (!summary) return null;
-    if (state.detail === 'packages') {
-      if (key === 'funcs') return summary.funcs;
-      if (key === 'vars') return summary.vars;
-      if (key === 'consts') return summary.consts;
-      if (key === 'types') return summary.types;
-      if (key === 'ca') return summary.ca;
-      if (key === 'ce') return summary.ce;
-      if (key.indexOf('pkg:') === 0) return aggregateMetricValue(summary.pkgMetrics, key.slice(4));
-    } else {
-      if (key === 'exported') return summary.details ? summary.exported / summary.details : null;
-      if (key === 'fields') return meanStat(summary.fields);
-      if (key === 'methods') return meanStat(summary.methods);
-      if (key === 'lines') return meanStat(summary.lines);
-      if (key === 'cyclomatic') return meanStat(summary.cyclomatic);
-      if (key.indexOf('type:') === 0) return aggregateMetricValue(summary.typeMetrics, key.slice(5));
-    }
+    if (key === 'reusability') return meanStat(summary.reuse);
     return null;
   }
   function valueForDetailRow(r, key) {
     if (key === 'tree') return r.name;
-    if (key === 'kind') return r.itemKind || r.kind;
-    if (key === 'exported') return r.exported ? 1 : 0;
-    if (key === 'fields') return r.fields;
-    if (key === 'methods') return r.methods;
-    if (key === 'lines') return r.lines;
-    if (key === 'cyclomatic') return r.cyclomatic;
-    if (key.indexOf('type:') === 0) return metricValue(r.metrics, key.slice(5));
+    if (key === 'reusability') return metricValue(r.reusability);
     return null;
   }
   function compareRaw(a, b, type) {
@@ -678,33 +480,30 @@
     });
   }
 
-  function metricCell(name, metrics) {
-    var m = metrics && metrics[name];
+  function metricCell(m) {
     if (!m || !m.applicable) return el('span', { class: 'na', title: m && m.reason ? m.reason : 'not applicable' }, '–');
-    var qc = qualityClass(name, m.value);
-    var wrap = el('span', { class: 'metriccell' + (qc ? ' ' + qc : ''), title: meta(name).full + (m.definition ? '\n' + m.definition : '') });
+    var qc = qualityClass(m.value);
+    var wrap = el('span', { class: 'metriccell' + (qc ? ' ' + qc : ''), title: meta().full + (m.definition ? '\n' + m.definition : '') });
     wrap.appendChild(document.createTextNode(fmt(m.value)));
     var bar = el('span', { class: 'bar', 'aria-hidden': 'true' });
-    bar.appendChild(el('span', { class: 'fill' + (qc ? ' ' + qc : ''), style: 'width:' + (frac(name, m.value) * 100).toFixed(1) + '%' }));
+    bar.appendChild(el('span', { class: 'fill' + (qc ? ' ' + qc : ''), style: 'width:' + (frac(m.value) * 100).toFixed(1) + '%' }));
     wrap.appendChild(bar);
     return wrap;
   }
-  function aggregateMetricCell(name, stats) {
-    var value = aggregateMetricValue(stats, name);
+  function aggregateMetricCell(stat) {
+    var value = meanStat(stat);
     if (value === null || value === undefined) return el('span', { class: 'na', title: 'no applicable values' }, '–');
-    var qc = qualityClass(name, value);
-    var wrap = el('span', { class: 'metriccell' + (qc ? ' ' + qc : ''), title: 'mean ' + meta(name).full });
+    var qc = qualityClass(value);
+    var wrap = el('span', { class: 'metriccell' + (qc ? ' ' + qc : ''), title: 'mean ' + meta().full });
     wrap.appendChild(document.createTextNode(fmt(value)));
     var bar = el('span', { class: 'bar', 'aria-hidden': 'true' });
-    bar.appendChild(el('span', { class: 'fill' + (qc ? ' ' + qc : ''), style: 'width:' + (frac(name, value) * 100).toFixed(1) + '%' }));
+    bar.appendChild(el('span', { class: 'fill' + (qc ? ' ' + qc : ''), style: 'width:' + (frac(value) * 100).toFixed(1) + '%' }));
     wrap.appendChild(bar);
     return wrap;
   }
   function aggregateText(col, node) {
     var value = valueForTreeNode(node, col.key);
     if (value === null || value === undefined || value === '') return '–';
-    if (col.key === 'exported') return Math.round(value * 100) + '%';
-    if (state.detail === 'packages') return String(value);
     return fmt(value);
   }
   function treeCell(label, depth, rowKind, hasChildren, collapsed, title, toggle) {
@@ -724,7 +523,7 @@
     var td = el('td', { class: col.type === 'number' || col.type === 'boolean' ? 'num' : '' });
     if (col.tree) {
       if (row.type === 'tree') {
-        td.appendChild(treeCell(node.label, depth, node.kind, node.children.length || (node.kind === 'package' && state.detail !== 'packages'), !!state.collapsed[node.id], node.search, function () {
+        td.appendChild(treeCell(node.label, depth, node.kind, node.children.length || node.kind === 'package', !!state.collapsed[node.id], node.search, function () {
           state.collapsed[node.id] = !state.collapsed[node.id];
           paint();
         }));
@@ -732,19 +531,10 @@
         td.appendChild(treeCell(row.data.name, depth, row.data.kind, false, false, row.data.pkg.path + ' ' + row.data.name));
       }
     } else if (row.type === 'tree') {
-      if (col.key === 'kind') td.textContent = '';
-      else if (col.pkgMetric) td.appendChild(aggregateMetricCell(col.metric, node.summary && node.summary.pkgMetrics));
-      else if (col.typeMetric) td.appendChild(aggregateMetricCell(col.metric, node.summary && node.summary.typeMetrics));
+      if (col.key === 'reusability') td.appendChild(aggregateMetricCell(node.summary && node.summary.reuse));
       else td.textContent = aggregateText(col, node);
     } else if (row.type === 'detail') {
-      var d = row.data;
-      if (col.key === 'kind') td.textContent = d.itemKind || d.kind;
-      else if (col.key === 'exported') td.textContent = d.exported ? 'yes' : 'no';
-      else if (col.key === 'fields') td.textContent = String(d.fields);
-      else if (col.key === 'methods') td.textContent = String(d.methods);
-      else if (col.key === 'lines') td.textContent = String(d.lines);
-      else if (col.key === 'cyclomatic') td.textContent = String(d.cyclomatic);
-      else if (col.typeMetric) td.appendChild(metricCell(col.metric, d.metrics));
+      if (col.key === 'reusability') td.appendChild(metricCell(row.data.reusability));
     }
     tr.appendChild(td);
   }
@@ -795,7 +585,7 @@
       body.appendChild(tr);
       if (state.collapsed[n.id]) return;
 
-      if (n.kind === 'package' && state.detail !== 'packages') {
+      if (n.kind === 'package') {
         var rows = sortedDetails(n.details || []);
         if (rows.length) {
           rows.forEach(function (d) {
@@ -826,8 +616,6 @@
   function paint() {
     renderTable();
     syncLevelPills();
-    syncKindPills();
-    syncExportPills();
     syncHideNA();
   }
 
@@ -851,44 +639,12 @@
   var tiles = document.getElementById('tiles');
   tiles.appendChild(tile(packages.length, 'packages'));
   tiles.appendChild(tile(typeRows.length, 'types'));
-  tiles.appendChild(tile(packages.reduce(function (s, p) { return s + p.funcs; }, 0), 'functions and methods'));
-  tiles.appendChild(tile(packages.reduce(function (s, p) { return s + p.vars; }, 0), 'variables'));
-  tiles.appendChild(tile(packages.reduce(function (s, p) { return s + p.consts; }, 0), 'constants'));
 
-  var kindPills = document.getElementById('kind-pills');
-  DETAIL_KINDS.forEach(function (kind) {
-    var p = el('button', { class: 'pill', type: 'button', 'data-kind': kind.key }, kind.label);
-    p.addEventListener('click', function () {
-      state.detail = kind.key;
-      state.sort = { key: 'tree', dir: 'asc' };
-      paint();
-    });
-    kindPills.appendChild(p);
-  });
-  var exportPills = document.getElementById('export-pills');
-  EXPORT_MODES.forEach(function (mode) {
-    var p = el('button', { class: 'pill', type: 'button', 'data-export': mode.key }, mode.label);
-    p.addEventListener('click', function () {
-      state.exportMode = mode.key;
-      paint();
-    });
-    exportPills.appendChild(p);
-  });
-  function syncKindPills() {
-    kindPills.querySelectorAll('.pill').forEach(function (p) { p.classList.toggle('active', state.detail === p.dataset.kind); });
-  }
-  function syncExportPills() {
-    var disabled = state.detail === 'packages';
-    exportPills.querySelectorAll('.pill').forEach(function (p) {
-      p.disabled = disabled;
-      p.classList.toggle('active', state.exportMode === p.dataset.export);
-    });
-  }
   function syncHideNA() {
     var box = document.getElementById('hide-na');
     var lab = document.getElementById('hide-na-label');
-    box.disabled = state.detail !== 'types';
-    lab.classList.toggle('disabled', box.disabled);
+    box.disabled = false;
+    lab.classList.remove('disabled');
   }
 
   var pkgFilter = document.getElementById('pkg-filter');
@@ -912,43 +668,6 @@
       q.value = ''; state.q = ''; q.blur(); paint();
     }
   });
-
-  var sheet = document.getElementById('col-sheet');
-  var colBtn = document.getElementById('col-btn');
-  typeCols.concat(pkgCols).forEach(function (c) {
-    var lab = el('label', { class: 'check', title: meta(c).full });
-    var box = el('input', { type: 'checkbox' });
-    box.checked = true;
-    box.addEventListener('change', function () {
-      if (box.checked) delete state.hidden[c];
-      else state.hidden[c] = true;
-      paint();
-    });
-    lab.appendChild(box);
-    lab.appendChild(document.createTextNode(meta(c).label));
-    sheet.appendChild(lab);
-  });
-  function closeSheet() {
-    sheet.hidden = true;
-    colBtn.classList.remove('active');
-    colBtn.setAttribute('aria-expanded', 'false');
-  }
-  function positionSheet() {
-    var r = colBtn.getBoundingClientRect();
-    sheet.style.top = (r.bottom + 6) + 'px';
-    sheet.style.left = Math.max(12, Math.min(r.left, window.innerWidth - sheet.offsetWidth - 12)) + 'px';
-  }
-  colBtn.addEventListener('click', function (e) {
-    e.stopPropagation();
-    if (!sheet.hidden) { closeSheet(); return; }
-    sheet.hidden = false;
-    colBtn.classList.add('active');
-    colBtn.setAttribute('aria-expanded', 'true');
-    positionSheet();
-  });
-  document.addEventListener('click', function (e) { if (!sheet.hidden && !sheet.contains(e.target)) closeSheet(); });
-  window.addEventListener('resize', closeSheet);
-  window.addEventListener('scroll', function () { if (!sheet.hidden) positionSheet(); }, { passive: true });
 
   var levelPills = document.getElementById('level-pills');
   var maxDepth = 1;

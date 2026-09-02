@@ -65,10 +65,8 @@ func TestReportedMetricIsReusability(t *testing.T) {
 
 	pkg := result.Packages[0]
 	for _, typ := range pkg.Types {
-		for _, r := range typ.Metrics {
-			if r.Name != metrics.MetricReusability {
-				t.Fatalf("unexpected type metric %q in display set", r.Name)
-			}
+		if typ.Reusability.Name != metrics.MetricReusability {
+			t.Fatalf("unexpected type metric %q in display set", typ.Reusability.Name)
 		}
 	}
 }

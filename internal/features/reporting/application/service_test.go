@@ -28,16 +28,14 @@ func sampleReport() reusability.Report {
 	}
 
 	return reusability.Report{
-		SchemaVersion: "1",
+		SchemaVersion: "6",
 		Tool:          reusability.ToolInfo{Name: "reusability", Version: "test"},
 		Module:        "example.com/m",
 		Packages: []reusability.PackageReport{{
-			Path:   "example.com/m/a",
-			Vars:   2,
-			Consts: 3,
+			Path: "example.com/m/a",
 			Types: []reusability.TypeReport{
-				{Name: "A", Metrics: []metrics.MetricResult{applicable}},
-				{Name: "B", Metrics: []metrics.MetricResult{na}},
+				{Name: "A", Reusability: applicable},
+				{Name: "B", Reusability: na},
 			},
 		}},
 	}
@@ -60,41 +58,25 @@ func TestRenderJSONContract(t *testing.T) {
 		t.Fatalf("invalid JSON: %v\n%s", err, buf.String())
 	}
 
-	if got["schema_version"] != "1" {
+	if got["schema_version"] != "6" {
 		t.Errorf("schema_version = %v", got["schema_version"])
 	}
 
 	pkg := got["packages"].([]any)[0].(map[string]any)
-	if pkg["vars"].(float64) != 2 || pkg["consts"].(float64) != 3 {
-		t.Errorf("package counts = vars %v consts %v, want 2 and 3", pkg["vars"], pkg["consts"])
+	if _, ok := pkg["afferent"]; ok {
+		t.Error("package afferent should not be in JSON schema v6")
 	}
 
 	typ := pkg["types"].([]any)[0].(map[string]any)
-	metricsObj := typ["metrics"].(map[string]any)
-	reuse := metricsObj["reusability"].(map[string]any)
+	reuse := typ["reusability"].(map[string]any)
 	if reuse["applicable"] != true {
 		t.Error("first reusability entry must be applicable")
 	}
 	if reuse["value"].(float64) != 0.7 {
 		t.Errorf("reusability value = %v", reuse["value"])
 	}
-}
-
-// White-box: ordered metric objects keep the given slice order.
-func TestEncodeOrderedMetricsPreservesOrder(t *testing.T) {
-	t.Parallel()
-
-	got, err := encodeOrderedMetrics([]metrics.MetricResult{
-		{Name: "amc", Scope: metrics.ScopeType, Value: 1, Applicable: true, Definition: "d"},
-		{Name: "tcc", Scope: metrics.ScopeType, Applicable: false, Reason: "x", Definition: "d"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	s := string(got)
-	if !strings.HasPrefix(s, `{"amc":`) || strings.Index(s, "amc") > strings.Index(s, "tcc") {
-		t.Errorf("order not preserved: %s", s)
+	if _, ok := typ["metrics"]; ok {
+		t.Error("type metrics map should not appear in JSON schema v6")
 	}
 }
 

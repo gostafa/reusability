@@ -2,35 +2,32 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	policydomain "github.com/gostafa/reusability/internal/features/policy/domain"
-	"github.com/gostafa/reusability/internal/features/reporting/ports/outbound"
 	"github.com/gostafa/reusability/internal/shared/metrics"
 	"github.com/gostafa/reusability/reusability"
 )
 
-func TestOverrideListErrorsAndString(t *testing.T) {
-	var overrides overrideList
-	if err := overrides.Set(" types = 3.5 "); err != nil {
+func TestRuleListErrorsAndString(t *testing.T) {
+	var rules ruleList
+	if err := rules.Set(" **/internal/** : 0.7 "); err != nil {
 		t.Fatal(err)
 	}
-	if got := overrides.String(); got != "types=3.5" {
+	if got := rules.String(); got != "**/internal/**:0.7" {
 		t.Fatalf("String() = %q", got)
 	}
 
-	for _, value := range []string{"types", " =1", "types=not-a-number"} {
-		if err := overrides.Set(value); err == nil {
+	for _, value := range []string{"pattern", ":0.7", "pattern=0.7", "pattern:not-a-number"} {
+		if err := rules.Set(value); err == nil {
 			t.Errorf("Set(%q) succeeded, want error", value)
 		}
 	}
 }
 
-func TestResolvePolicyRequiresThresholdsAndIgnoresConfigFiles(t *testing.T) {
+func TestResolvePolicyRequiresRules(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	config := filepath.Join(dir, ".modularity.yml")
@@ -38,27 +35,22 @@ func TestResolvePolicyRequiresThresholdsAndIgnoresConfigFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, err := resolvePolicy(overrideList{}, overrideList{}); err == nil {
+	if _, _, err := resolvePolicy(ruleList{}); err == nil {
 		t.Fatal("empty flag policy succeeded")
 	}
 
-	maxima := overrideList{items: []override{{key: policydomain.KeyTypes, value: 5}}}
-	policy, source, err := resolvePolicy(maxima, overrideList{})
+	rules := ruleList{items: []ruleSpec{{pattern: "**/internal/**", min: 0.8}}}
+	got, source, err := resolvePolicy(rules)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if policy.Package.Types.Max != 5 || source != "flag thresholds" {
-		t.Fatalf("flag policy = %+v, source = %q", policy.Package.Types, source)
+	if len(got) != 1 || got[0].Min != 0.8 || source != "flag rules" {
+		t.Fatalf("flag rules = %+v, source = %q", got, source)
 	}
 
-	badMinimum := overrideList{items: []override{{key: "bogus", value: 1}}}
-	if _, _, err := resolvePolicy(overrideList{}, badMinimum); err == nil {
-		t.Fatal("unknown minimum override succeeded")
-	}
-
-	contradictory := overrideList{items: []override{{key: policydomain.KeyTypes, value: 6}}}
-	if _, _, err := resolvePolicy(maxima, contradictory); err == nil {
-		t.Fatal("minimum above configured maximum succeeded")
+	bad := ruleList{items: []ruleSpec{{pattern: "**", min: 2}}}
+	if _, _, err := resolvePolicy(bad); err == nil {
+		t.Fatal("invalid rule min succeeded")
 	}
 }
 
@@ -101,149 +93,83 @@ func TestRunPassesReusabilityWeights(t *testing.T) {
 	analyze = func(_ context.Context, cfg reusability.Config) (reusability.Report, error) {
 		got = cfg.ReusabilityWeights
 
-		return reusability.Report{
-			SchemaVersion: "2",
-			Tool:          reusability.ToolInfo{Name: "reusability", Version: "test"},
-			Module:        "example.com/m",
-		}, nil
+		return reusability.Report{}, nil
 	}
 
-	out := filepath.Join(t.TempDir(), "r.json")
-	code := run([]string{
-		"--format=json",
-		"--output=" + out,
+	if code := run([]string{
 		"--reusability-weight-cohesion=0.1",
-		"--reusability-weight-coupling=0",
+		"--reusability-weight-coupling=0.2",
 		"--reusability-weight-testability=0.3",
-		"--reusability-weight-documentation=0.6",
-		"./...",
-	})
-	if code != 0 {
+		"--reusability-weight-documentation=0.4",
+	}); code != 0 {
 		t.Fatalf("exit = %d, want 0", code)
 	}
 
 	want := metrics.ReusabilityWeights{
-		Cohesion:      0.1,
-		Coupling:      0,
-		Testability:   0.3,
-		Documentation: 0.6,
+		Cohesion: 0.1, Coupling: 0.2, Testability: 0.3, Documentation: 0.4,
 	}
 	if got != want {
 		t.Fatalf("weights = %+v, want %+v", got, want)
 	}
 }
 
-func TestResolvePolicyOverrideSource(t *testing.T) {
-	maxima := overrideList{items: []override{{key: policydomain.KeyTypes, value: 20}}}
-	_, source, err := resolvePolicy(maxima, overrideList{})
+func TestRunCheckRequiresRules(t *testing.T) {
+	if code := run([]string{"--check", "./..."}); code != 2 {
+		t.Fatalf("check without rules exit = %d, want 2", code)
+	}
+}
+
+func TestRunCheckWithRules(t *testing.T) {
+	original := analyze
+	t.Cleanup(func() { analyze = original })
+
+	analyze = func(_ context.Context, _ reusability.Config) (reusability.Report, error) {
+		return reusability.Report{Packages: []reusability.PackageReport{{
+			Path: "example.com/p",
+			Types: []reusability.TypeReport{{
+				Name: "T",
+				Reusability: metrics.MetricResult{
+					Name: metrics.MetricReusability, Applicable: true, Value: 0.5,
+				},
+			}},
+		}}}, nil
+	}
+
+	if code := run([]string{"--check", `--rule=**:0.8`}); code != 3 {
+		t.Fatalf("policy violation exit = %d, want 3", code)
+	}
+}
+
+func TestRunPolicySourceLogged(t *testing.T) {
+	original := analyze
+	t.Cleanup(func() { analyze = original })
+
+	analyze = func(_ context.Context, _ reusability.Config) (reusability.Report, error) {
+		return reusability.Report{Packages: []reusability.PackageReport{{
+			Path: "p",
+			Types: []reusability.TypeReport{{
+				Name: "T",
+				Reusability: metrics.MetricResult{
+					Name: metrics.MetricReusability, Applicable: true, Value: 0.9,
+				},
+			}},
+		}}}, nil
+	}
+
+	if code := run([]string{"--check", `--rule=**:0.7`}); code != 0 {
+		t.Fatalf("passing check exit = %d, want 0", code)
+	}
+}
+
+func TestResolvePolicyValidatesRules(t *testing.T) {
+	rules, _, err := resolvePolicy(ruleList{items: []ruleSpec{
+		{pattern: "**/internal/**", min: 0.8},
+		{pattern: "**", min: 0.6},
+	}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(source, "flag thresholds") {
-		t.Fatalf("source = %q", source)
-	}
-}
-
-func stubAnalyze(t *testing.T) {
-	t.Helper()
-	original := analyze
-	t.Cleanup(func() { analyze = original })
-	analyze = func(context.Context, reusability.Config) (reusability.Report, error) {
-		return reusability.Report{
-			SchemaVersion: "2",
-			Tool:          reusability.ToolInfo{Name: "reusability", Version: "test"},
-			Module:        "example.com/m",
-		}, nil
-	}
-}
-
-func TestRunCanceledAnalysis(t *testing.T) {
-	original := analyze
-	t.Cleanup(func() { analyze = original })
-	analyze = func(context.Context, reusability.Config) (reusability.Report, error) {
-		return reusability.Report{}, context.Canceled
-	}
-	if code := run([]string{"./..."}); code != 130 {
-		t.Fatalf("exit = %d, want 130", code)
-	}
-}
-
-func TestRunMemoryProfileAndReportWriteErrors(t *testing.T) {
-	stubAnalyze(t)
-
-	badHeap := filepath.Join(t.TempDir(), "missing", "heap.prof")
-	if code := run([]string{"--memory-profile=" + badHeap, "./..."}); code != 1 {
-		t.Fatalf("bad memory profile exit = %d", code)
-	}
-
-	outDir := t.TempDir()
-	if err := os.Chmod(outDir, 0o500); err != nil {
+	if err := policydomain.Validate(rules); err != nil {
 		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(outDir, 0o700) })
-	out := filepath.Join(outDir, "report.json")
-	if code := run([]string{"--format=json", "--output=" + out, "./..."}); code != 1 {
-		t.Fatalf("unwritable output exit = %d", code)
-	}
-}
-
-func TestRunWebDefaultOpensBrowser(t *testing.T) {
-	stubAnalyze(t)
-	origTerm, origOpen := isTerminal, openBrowser
-	t.Cleanup(func() { isTerminal, openBrowser = origTerm, origOpen })
-
-	dir := t.TempDir()
-	t.Chdir(dir)
-	isTerminal = func() bool { return true }
-	openBrowser = func(string) error { return errors.New("no browser") }
-
-	if code := run([]string{"--format=web", "./..."}); code != 0 {
-		t.Fatalf("web default exit = %d", code)
-	}
-	if _, err := os.Stat(filepath.Join(dir, defaultWebReportName)); err != nil {
-		t.Fatalf("default web report missing: %v", err)
-	}
-}
-
-func TestRunCPUStopProfileError(t *testing.T) {
-	stubAnalyze(t)
-	orig := startCPU
-	t.Cleanup(func() { startCPU = orig })
-
-	startCPU = func(string) (func() error, error) {
-		return func() error { return errors.New("stop failed") }, nil
-	}
-	if code := run(
-		[]string{"--cpu-profile=" + filepath.Join(t.TempDir(), "cpu.prof"), "./..."},
-	); code != 0 {
-		t.Fatalf("exit = %d, want 0 (stop error is logged only)", code)
-	}
-}
-
-func TestRunWebHelpTerminalBrowserWarn(t *testing.T) {
-	origTerm, origOpen := isTerminal, openBrowser
-	t.Cleanup(func() { isTerminal, openBrowser = origTerm, origOpen })
-	isTerminal = func() bool { return true }
-	openBrowser = func(string) error { return errors.New("open failed") }
-	if code := runWebHelp(); code != 0 {
-		t.Fatalf("runWebHelp exit = %d", code)
-	}
-}
-
-func TestWriteHelpDocsCloseAndWriteErrors(t *testing.T) {
-	origCreate, origClose, origDocs := createHelpTemp, closeHelpFile, writeDocs
-	t.Cleanup(func() {
-		createHelpTemp, closeHelpFile, writeDocs = origCreate, origClose, origDocs
-	})
-
-	closeHelpFile = func(*os.File) error { return errors.New("close failed") }
-	if _, err := writeHelpDocs(); err == nil {
-		t.Fatal("want close error")
-	}
-
-	closeHelpFile = origClose
-	writeDocs = func(outbound.Sink, string) error { return errors.New("docs failed") }
-	if _, err := writeHelpDocs(); err == nil {
-		t.Fatal("want docs write error")
 	}
 }

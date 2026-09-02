@@ -55,24 +55,6 @@ type PackageFacts struct {
 	// Imports are the package's distinct import paths, sorted, without
 	// self-imports. Scope filtering happens in the architecture feature.
 	Imports []string
-	// ExportedFuncCount is the number of declared functions and methods with
-	// an exported name in the package's non-excluded files.
-	ExportedFuncCount int
-	// UnexportedFuncCount is the number of declared functions and methods with
-	// an unexported name in the package's non-excluded files.
-	UnexportedFuncCount int
-	// VarCount is the number of top-level variable names declared in the
-	// package's non-excluded files, excluding blank identifiers.
-	VarCount int
-	// ConstCount is the number of top-level constant names declared in the
-	// package's non-excluded files, excluding blank identifiers.
-	ConstCount int
-	// Variables are the package's top-level variable names.
-	Variables []DeclarationFacts
-	// Constants are the package's top-level constant names.
-	Constants []DeclarationFacts
-	// Functions are the package's top-level functions, excluding methods.
-	Functions []FunctionFacts
 	// TypeIDs are the package's analyzed types in name order.
 	TypeIDs []int
 }

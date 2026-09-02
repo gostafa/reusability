@@ -41,10 +41,7 @@ func TestTextMultiSectionSpacerAndMissingMetrics(t *testing.T) {
 				Path: "example.com/m/leaf",
 				Types: []reusability.TypeReport{{
 					Name: "T",
-					Metrics: []metrics.MetricResult{
-						typeMetric(metrics.MetricReusability, 0.5),
-						{Name: "custom", Scope: metrics.ScopeType, Value: 9, Applicable: true},
-					},
+					Reusability: typeMetric(metrics.MetricReusability, 0.5),
 				}},
 			},
 		},
@@ -71,21 +68,17 @@ func TestTextExplainAllTypesAndSkipEmptyNotes(t *testing.T) {
 			{
 				Path: "example.com/m/noisy",
 				Types: []reusability.TypeReport{
-					{Name: "A", Metrics: []metrics.MetricResult{
-						{
-							Name:       metrics.MetricReusability,
-							Scope:      metrics.ScopeType,
-							Applicable: false,
-							Reason:     "every component dropped",
-						},
+					{Name: "A", Reusability: metrics.MetricResult{
+						Name:       metrics.MetricReusability,
+						Scope:      metrics.ScopeType,
+						Applicable: false,
+						Reason:     "every component dropped",
 					}},
-					{Name: "B", Metrics: []metrics.MetricResult{
-						{
-							Name:       metrics.MetricReusability,
-							Scope:      metrics.ScopeType,
-							Applicable: false,
-							Reason:     "every component dropped",
-						},
+					{Name: "B", Reusability: metrics.MetricResult{
+						Name:       metrics.MetricReusability,
+						Scope:      metrics.ScopeType,
+						Applicable: false,
+						Reason:     "every component dropped",
 					}},
 				},
 			},

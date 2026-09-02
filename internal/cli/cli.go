@@ -128,21 +128,16 @@ func run(args []string) int {
 		check         = fs.Bool(
 			"check",
 			false,
-			"enforce -max/-min thresholds and exit 3 on violations",
+			"enforce -rule thresholds and exit 3 on violations",
 		)
 	)
 
-	var maxOverrides, minOverrides overrideList
+	var ruleFlags ruleList
 
 	fs.Var(
-		&maxOverrides,
-		"max",
-		"policy upper-bound threshold key=value (repeatable; metric keys may be scoped as type.reusability; implies -check)",
-	)
-	fs.Var(
-		&minOverrides,
-		"min",
-		"policy lower-bound threshold key=value (repeatable; metric keys may be scoped as type.reusability; implies -check)",
+		&ruleFlags,
+		"rule",
+		"policy rule pattern:min (repeatable; e.g. '**/internal/**':0.8; requires -check)",
 	)
 	if err := fs.Parse(args); err != nil {
 		// --help --web (either order) opens the metrics guide instead of
@@ -202,24 +197,24 @@ func run(args []string) int {
 		}()
 	}
 
-	// A policy gate runs only when explicitly requested: -check or any -max /
-	// -min threshold.
-	gating := *check || len(maxOverrides.items) > 0 || len(minOverrides.items) > 0
+	// A policy gate runs only when explicitly requested via -check with at
+	// least one -rule.
+	gating := *check
 
 	var (
-		policy       policydomain.Policy
+		rules        []policydomain.Rule
 		policySource string
 	)
 
 	if gating {
-		resolved, source, err := resolvePolicy(maxOverrides, minOverrides)
+		resolved, source, err := resolvePolicy(ruleFlags)
 		if err != nil {
 			logger.Error("policy configuration failed", "error", err)
 
 			return 2
 		}
 
-		policy, policySource = resolved, source
+		rules, policySource = resolved, source
 	}
 
 	reusabilityWeights := reusability.ReusabilityWeights{
@@ -312,7 +307,7 @@ func run(args []string) int {
 	// and CI stay clean, and a distinct exit code lets CI gate on it. Both
 	// outcomes name the policy source so a run is never a silent no-op.
 	if gating {
-		violations := policydomain.Evaluate(report, policy)
+		violations := policydomain.Evaluate(report, rules)
 		if len(violations) > 0 {
 			logger.Error(
 				"policy check failed",
