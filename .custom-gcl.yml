@@ -1,0 +1,13 @@
+---
+# Custom golangci-lint binary including reusability.
+# Build: golangci-lint custom -v
+# Run:   ./custom-gcl run ./...
+#
+# See https://golangci-lint.run/docs/plugins/module-plugins/
+version: v2.12.2
+name: custom-gcl
+destination: .
+plugins:
+  - module: github.com/gostafa/reusability
+    import: github.com/gostafa/reusability/plugin
+    path: .

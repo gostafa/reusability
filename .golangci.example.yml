@@ -1,0 +1,53 @@
+---
+# Example golangci-lint v2 config enabling the reusability Module Plugin.
+# Requires a custom binary built from .custom-gcl.yml (golangci-lint custom).
+version: '2'
+linters:
+  default: none
+  enable: [reusability]
+  settings:
+    custom:
+      reusability:
+        type: module
+        description: Enforce Go type reusability policy thresholds
+        settings:
+          patterns: [./...]
+          tests: false
+          generated: false
+          dependency-scope: module
+          field-usage: direct
+          reusability-weights:
+            cohesion: 0.35
+            coupling: 0.25
+            testability: 0.25
+            documentation: 0.15
+
+          # Policy limits are configured inline. A bare number is shorthand
+          # for max. Remove all policy sections to use the recommended
+          # defaults. Hidden metrics (amc, lcom, tcc, cbo) are rejected.
+          funcs:
+            lines:
+              max: 80
+            cyclomatic:
+              max: 10
+          package:
+            types:
+              max: 12
+            funcs:
+              max: 30
+            vars:
+              max: 20
+            consts:
+              max: 30
+            afferent:
+              max: 20
+            efferent:
+              max: 10
+          type:
+            fields:
+              max: 8
+            methods:
+              max: 10
+            metrics:
+              reusability:
+                min: 0.7

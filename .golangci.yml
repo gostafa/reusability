@@ -1,0 +1,41 @@
+---
+version: '2'
+run:
+  timeout: 10m
+linters:
+  default: standard
+  # tagliatelle would rename the domain DTO JSON tags to camelCase, but those
+  # snake_case tags are the documented wire contract with the Svelte frontend
+  # (see cmd/activity-tracker/frontend, e.g. task.js "JSON shape (snake_case)").
+  disable: [wsl, ireturn, gomodguard, tagliatelle]
+  settings:
+    cyclop:
+      max-complexity: 5
+      package-average: 5.0
+    wsl_v5:
+      allow-first-in-block: true
+      allow-whole-block: false
+      branch-max-lines: 2
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: ^log$
+              desc: use log/slog instead
+    varnamelen:
+      # Conventional short names that are clearer than a verbose alternative.
+      ignore-names: [tx, db, id, ok]
+    exhaustruct:
+      exclude:
+        - .+/pb\..+
+        # Third-party option structs are intentionally partially initialized.
+        - github\.com/wailsapp/wails/v3/pkg/application\..+
+        - go\.etcd\.io/bbolt\.Options
+        # Platform syscall struct: only Pdeathsig is set; the remaining fields are
+        # OS-specific and intentionally left zero.
+        - syscall\.SysProcAttr
+  exclusions:
+    paths: [.*\.pb\.go]
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

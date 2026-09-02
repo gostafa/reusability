@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>reusability metrics guide</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23000'/%3E%3Crect x='4' y='4' width='8' height='8' rx='1.5' fill='%23fff'/%3E%3C/svg%3E">
+<script>
+(function () {
+  var t = null;
+  try { t = localStorage.getItem('gm-theme'); } catch (e) { /* private mode */ }
+  if (t !== 'light' && t !== 'dark') {
+    t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  document.documentElement.dataset.theme = t;
+})();
+</script>
+<style>
+  /* Monochrome chrome; green/orange/red are reserved for metric quality. */
+  :root[data-theme="light"] {
+    --bg: #ffffff; --fg: #000000; --mut: #6b6b6b; --faint: #9a9a9a;
+    --line: #e6e6e6; --track: #ededed; --hover: #f6f6f6; --raise: #fafafa;
+    --shadow: 0 1px 2px rgba(0,0,0,.05);
+    --good: #15803d; --warn: #b45309; --bad: #dc2626;
+  }
+  :root[data-theme="dark"] {
+    --bg: #000000; --fg: #ffffff; --mut: #9a9a9a; --faint: #6b6b6b;
+    --line: #242424; --track: #1d1d1d; --hover: #101010; --raise: #0a0a0a;
+    --shadow: 0 1px 2px rgba(0,0,0,.6);
+    --good: #3fb950; --warn: #f59e0b; --bad: #f85149;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px 64px; }
+
+  /* ---- header ---- */
+  header.top { padding: 26px 0 6px; }
+  .brand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .brand h1 { margin: 0; font-size: 21px; letter-spacing: -.01em; }
+  .brand .sub { color: var(--mut); font-size: 15px; }
+  .brand .ver { color: var(--faint); font-size: 13px; }
+  .lede { color: var(--mut); font-size: 13.5px; margin-top: 4px; max-width: 640px; }
+
+  /* ---- toolbar ---- */
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 14px 0 18px; }
+  input[type="search"] {
+    appearance: none; background: var(--bg); color: var(--fg);
+    border: 1px solid var(--line); border-radius: 9px; padding: 6px 11px;
+    font: inherit; font-size: 13px; width: 260px;
+  }
+  input[type="search"]::placeholder { color: var(--faint); }
+  .count { margin-left: auto; color: var(--mut); font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .btn {
+    appearance: none; border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+    border-radius: 9px; padding: 6px 11px; font: inherit; font-size: 13px; cursor: pointer;
+    transition: background .15s ease;
+  }
+  .btn:hover { background: var(--hover); }
+  .theme { font-size: 15px; line-height: 1; padding: 6px 10px; }
+
+  /* ---- layout: sticky TOC + cards ---- */
+  .layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 30px; align-items: start; }
+  aside.toc {
+    position: sticky; top: 14px; max-height: calc(100vh - 28px); overflow: auto;
+    font-size: 13px; padding-right: 6px;
+  }
+  .toc h3 {
+    margin: 14px 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--mut); font-weight: 600;
+  }
+  .toc h3:first-child { margin-top: 2px; }
+  .toc a {
+    display: flex; justify-content: space-between; gap: 8px; align-items: baseline;
+    color: var(--mut); text-decoration: none; padding: 3px 8px; border-radius: 6px;
+    border-left: 2px solid transparent;
+  }
+  .toc a:hover { background: var(--hover); color: var(--fg); }
+  .toc a.active { color: var(--fg); font-weight: 600; border-left-color: var(--fg); border-radius: 0 6px 6px 0; }
+  .toc a .full { color: var(--faint); font-size: 11px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .toc a[hidden] { display: none; }
+
+  /* ---- metric cards ---- */
+  section.group { margin: 0 0 8px; }
+  .group > h2 {
+    margin: 26px 0 2px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--mut); font-weight: 600;
+  }
+  section.group:first-child > h2 { margin-top: 0; }
+  .group > .groupnote { color: var(--faint); font-size: 12.5px; margin: 0 0 12px; }
+  article.card {
+    border: 1px solid var(--line); border-radius: 12px; background: var(--raise);
+    box-shadow: var(--shadow); padding: 18px 20px 14px; margin: 0 0 14px;
+    scroll-margin-top: 14px;
+  }
+  article.card[hidden] { display: none; }
+  .card h3.title { margin: 0; font-size: 17px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .card h3.title .full { color: var(--mut); font-size: 13.5px; font-weight: 400; }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 0; }
+  .badge {
+    font-size: 11px; color: var(--mut); border: 1px solid var(--line); border-radius: 999px;
+    padding: 2px 9px; letter-spacing: .02em; white-space: nowrap; background: var(--bg);
+  }
+  .badge.dir-lower::before { content: "↓ "; }
+  .badge.dir-higher::before { content: "↑ "; }
+
+  .formula {
+    border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+    padding: 10px 14px 8px; margin: 12px 0 0; overflow-x: auto;
+  }
+  .formula math { font-size: 1.25em; }
+  .formula math[display="block"] { margin: 6px 0; }
+  .latex { border-top: 1px dashed var(--line); margin-top: 8px; padding-top: 6px; color: var(--faint); font-size: 11.5px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .latex code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; }
+
+  .card h4 { margin: 14px 0 3px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--mut); font-weight: 600; }
+  .card p { margin: 0; font-size: 13.5px; }
+  .card p.na { color: var(--mut); }
+  .example {
+    margin-top: 12px; font-size: 12.5px; color: var(--mut);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 11px;
+  }
+  .example samp { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: var(--fg); }
+  .example .exlabel { text-transform: uppercase; letter-spacing: .06em; font-size: 10.5px; margin-right: 8px; }
+
+  /* ---- quality range bar ---- */
+  .range { margin: 10px 0 0; }
+  .range .track { display: flex; height: 8px; border-radius: 5px; overflow: hidden; border: 1px solid var(--line); }
+  .range .seg { height: 100%; }
+  .range .seg.good { background: var(--good); }
+  .range .seg.warn { background: var(--warn); }
+  .range .seg.bad { background: var(--bad); }
+  .range .grad-lower { height: 100%; width: 100%; background: linear-gradient(90deg, var(--good), var(--warn), var(--bad)); }
+  .range .grad-higher { height: 100%; width: 100%; background: linear-gradient(90deg, var(--bad), var(--warn), var(--good)); }
+  .range .ticks { display: flex; justify-content: space-between; color: var(--faint); font-size: 10.5px; font-variant-numeric: tabular-nums; margin-top: 3px; }
+  .range .cap { color: var(--faint); font-size: 11.5px; margin-top: 3px; }
+
+  /* colors demo swatches */
+  .legend { display: inline-flex; gap: 10px; align-items: center; }
+  .swatch { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: baseline; }
+  .swatch.good { background: var(--good); }
+  .swatch.warn { background: var(--warn); }
+  .swatch.bad { background: var(--bad); }
+
+  .empty { padding: 42px 20px; text-align: center; color: var(--mut); border: 1px dashed var(--line); border-radius: 12px; }
+  footer { margin-top: 26px; color: var(--faint); font-size: 12px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+
+  /* Entrance animations fill backwards only, as on the report page. */
+  @keyframes rise { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+  header.top, .toolbar, .layout, footer { animation: rise .5s cubic-bezier(.2,.7,.2,1) backwards; }
+  .toolbar { animation-delay: .05s; } .layout { animation-delay: .1s; } footer { animation-delay: .15s; }
+
+  :focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; border-radius: 4px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; gap: 8px; }
+    aside.toc { position: static; max-height: none; display: none; }
+  }
+  @media (max-width: 700px) {
+    input[type="search"] { width: 100%; }
+    .count { margin-left: 0; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<script type="application/json" id="docs-data">__DOCS_DATA__</script>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1 id="tool-name">reusability</h1>
+      <span class="sub">metrics guide</span>
+      <span class="ver" id="tool-ver"></span>
+    </div>
+    <p class="lede">Every field the report shows: the formula behind it, how it is
+    calculated, what its values mean, and when they are good or bad — and why.</p>
+  </header>
+
+  <nav class="toolbar" aria-label="controls">
+    <input type="search" id="q" placeholder="Filter metrics…  ( / )" aria-label="filter metrics">
+    <span class="count" id="count"></span>
+    <button class="btn theme" id="theme-toggle" title="toggle black / white" aria-label="toggle theme">◐</button>
+  </nav>
+
+  <div class="layout">
+    <aside class="toc" id="toc" aria-label="contents"></aside>
+    <main id="content">
+      <!-- Metric groups are rendered here by the script, before #colors. -->
+      <section class="group" id="colors-group">
+        <h2>Reading the report</h2>
+        <p class="groupnote">how values turn into green, orange, and red</p>
+        <article class="card" id="colors" data-hay="reading the colors thresholds quality good bad review mixed n/a not applicable">
+          <h3 class="title">Colors <span class="full">quality thresholds and the n/a dash</span></h3>
+          <div class="formula" aria-label="threshold rule">
+            <!-- LaTeX: s = v \text{ (higher is better)} \qquad s = 1 - v \text{ (lower is better)} -->
+            <math display="block" alttext="s = v (higher is better), s = 1 - v (lower is better)"><mrow><mi>s</mi><mo>=</mo><mi>v</mi><mspace width="0.6em"></mspace><mtext>(higher is better)</mtext><mspace width="2em"></mspace><mi>s</mi><mo>=</mo><mn>1</mn><mo>−</mo><mi>v</mi><mspace width="0.6em"></mspace><mtext>(lower is better)</mtext></mrow></math>
+            <div class="latex"><code>s = v</code><code>s = 1 - v</code></div>
+          </div>
+          <h4>How it works</h4>
+          <p>Every colored cell reduces to a score <i>s</i> in 0–1, read on one fixed scale:
+          <span class="legend"><span><span class="swatch good" aria-hidden="true"></span>good at s ≥ 0.66</span>
+          <span><span class="swatch warn" aria-hidden="true"></span>mixed from s ≥ 0.33</span>
+          <span><span class="swatch bad" aria-hidden="true"></span>review below</span></span>.
+          Lower-is-better metrics flip the value first, so the colors always read the same way.</p>
+          <div class="range" aria-hidden="true">
+            <div class="track"><span class="seg bad" style="width:33%"></span><span class="seg warn" style="width:33%"></span><span class="seg good" style="width:34%"></span></div>
+            <div class="ticks"><span>0</span><span>0.33</span><span>0.66</span><span>1</span></div>
+            <div class="cap">the fixed scale for bounded metrics (after flipping lower-is-better values)</div>
+          </div>
+          <h4>Bounded vs unbounded</h4>
+          <p>Bounded metrics already live in 0–1 and use the thresholds directly. Unbounded
+          metrics (AMC, CBO) have no universal scale, so their values are first
+          normalized against the min–max range of their own column in your report — their
+          colors are relative to sibling types, and a column with no spread stays uncolored.
+          Abstractness and instability are never colored: neither end is universally good.</p>
+          <h4>The n/a dash</h4>
+          <p>A dash (–) means the metric cannot be calculated honestly for that entity —
+          for example, cohesion over method pairs with fewer than two methods. The tool
+          never substitutes a fake zero; hover the dash in the report for the exact reason,
+          also carried in the JSON and CSV <i>reason</i> field.</p>
+          <p class="example"><span class="exlabel">Remember</span><samp>colors are hints, not verdicts — compare similar types and packages, then read the code</samp></p>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var payload = JSON.parse(document.getElementById('docs-data').textContent);
+  var docs = payload.docs || [];
+  var tool = payload.tool || { name: 'reusability', version: '' };
+
+  var toolName = tool.name || 'reusability';
+  document.getElementById('tool-name').textContent = toolName;
+  document.getElementById('tool-ver').textContent = tool.version || '';
+  document.title = toolName + ' — metrics guide';
+
+  var GROUPS = [
+    { scope: 'type', title: 'Type metrics', note: 'computed per named type from its fields, methods, and signatures' },
+    { scope: 'package', title: 'Package metrics', note: 'computed per package from its types and its dependency graph' },
+    { scope: 'structural', title: 'Structural fields', note: 'raw counts that give the metrics their context — never colored' }
+  ];
+
+  function el(tag, attrs, text) {
+    var n = document.createElement(tag);
+    if (attrs) {
+      Object.keys(attrs).forEach(function (k) {
+        if (k === 'class') n.className = attrs[k];
+        else n.setAttribute(k, attrs[k]);
+      });
+    }
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+
+  function directionBadge(d) {
+    if (d.direction === 'lower') return el('span', { class: 'badge dir-lower' }, 'lower is better');
+    if (d.direction === 'higher') return el('span', { class: 'badge dir-higher' }, 'higher is better');
+    return el('span', { class: 'badge' }, 'no universal direction');
+  }
+
+  function rangeBar(d) {
+    if (d.scope === 'structural') return null;
+    var range = el('div', { class: 'range' });
+    var track = el('div', { class: 'track', 'aria-hidden': 'true' });
+    if (d.direction === 'neutral') {
+      if (!d.bounded) return null;
+      track.appendChild(el('span', { class: 'seg', style: 'width:100%;background:var(--track)' }));
+      range.appendChild(track);
+      var t0 = el('div', { class: 'ticks' });
+      t0.appendChild(el('span', {}, '0'));
+      t0.appendChild(el('span', {}, '1'));
+      range.appendChild(t0);
+      range.appendChild(el('div', { class: 'cap' }, 'range 0–1, shown uncolored — neither end is universally good'));
+      return range;
+    }
+    if (d.bounded) {
+      // Fixed thresholds at 0.33 / 0.66, segment order flipped for
+      // lower-is-better so the bar reads left-to-right like the values.
+      var order = d.direction === 'lower' ? ['good', 'warn', 'bad'] : ['bad', 'warn', 'good'];
+      track.appendChild(el('span', { class: 'seg ' + order[0], style: 'width:33%' }));
+      track.appendChild(el('span', { class: 'seg ' + order[1], style: 'width:33%' }));
+      track.appendChild(el('span', { class: 'seg ' + order[2], style: 'width:34%' }));
+      range.appendChild(track);
+      var ticks = el('div', { class: 'ticks' });
+      ['0', '0.33', '0.66', '1'].forEach(function (t) { ticks.appendChild(el('span', {}, t)); });
+      range.appendChild(ticks);
+      range.appendChild(el('div', { class: 'cap' }, 'fixed thresholds on the 0–1 value'));
+      return range;
+    }
+    track.appendChild(el('span', { class: d.direction === 'lower' ? 'grad-lower' : 'grad-higher' }));
+    range.appendChild(track);
+    var t2 = el('div', { class: 'ticks' });
+    t2.appendChild(el('span', {}, 'column min'));
+    t2.appendChild(el('span', {}, 'column max'));
+    range.appendChild(t2);
+    range.appendChild(el('div', { class: 'cap' },
+      'unbounded — colored relative to the min–max range of its column in your report'));
+    return range;
+  }
+
+  function card(d) {
+    var art = el('article', { class: 'card', id: d.name });
+    art.dataset.hay = (d.name + ' ' + d.label + ' ' + d.full_name + ' ' + d.summary + ' ' +
+      d.how + ' ' + d.interpretation).toLowerCase();
+
+    var title = el('h3', { class: 'title' });
+    title.appendChild(el('span', {}, d.label));
+    title.appendChild(el('span', { class: 'full' }, d.full_name));
+    art.appendChild(title);
+
+    var badges = el('div', { class: 'badges' });
+    badges.appendChild(el('span', { class: 'badge' }, d.scope === 'structural' ? 'counted' : d.scope + ' metric'));
+    if (d.scope !== 'structural') badges.appendChild(el('span', { class: 'badge' }, d.bounded ? 'bounded 0–1' : 'unbounded'));
+    badges.appendChild(directionBadge(d));
+    art.appendChild(badges);
+
+    if (d.formula_mathml) {
+      var formula = el('div', { class: 'formula', role: 'img', 'aria-label': d.formula_latex });
+      // formula_mathml is compile-time markup from the tool's own catalog:
+      // the ONLY field ever assigned via innerHTML. Everything else is
+      // inserted with textContent.
+      formula.innerHTML = d.formula_mathml;
+      var latex = el('div', { class: 'latex' });
+      (d.formula_latex || '').split('\n').forEach(function (line) {
+        latex.appendChild(el('code', {}, line));
+      });
+      if (d.definition) latex.appendChild(el('code', { title: 'versioned formula identifier' }, d.definition));
+      formula.appendChild(latex);
+      art.appendChild(formula);
+    }
+
+    art.appendChild(el('h4', {}, 'How it’s calculated'));
+    art.appendChild(el('p', {}, d.summary + ' ' + d.how));
+
+    var bar = rangeBar(d);
+    if (bar) art.appendChild(bar);
+
+    art.appendChild(el('h4', {}, 'Why it matters'));
+    art.appendChild(el('p', {}, d.interpretation));
+
+    if (d.not_applicable) {
+      art.appendChild(el('h4', {}, 'When it’s n/a'));
+      art.appendChild(el('p', { class: 'na' }, d.not_applicable));
+    }
+
+    if (d.example) {
+      var ex = el('p', { class: 'example' });
+      ex.appendChild(el('span', { class: 'exlabel' }, 'Example'));
+      ex.appendChild(el('samp', {}, d.example));
+      art.appendChild(ex);
+    }
+    return art;
+  }
+
+  // ---- render groups before the static colors section ----
+  var content = document.getElementById('content');
+  var colorsGroup = document.getElementById('colors-group');
+  GROUPS.forEach(function (g) {
+    var entries = docs.filter(function (d) { return d.scope === g.scope; });
+    if (!entries.length) return;
+    var section = el('section', { class: 'group', id: 'group-' + g.scope });
+    section.appendChild(el('h2', {}, g.title));
+    section.appendChild(el('p', { class: 'groupnote' }, g.note));
+    entries.forEach(function (d) { section.appendChild(card(d)); });
+    content.insertBefore(section, colorsGroup);
+  });
+
+  // ---- table of contents ----
+  var toc = document.getElementById('toc');
+  var tocLinks = {};
+  function tocGroup(title, entries) {
+    toc.appendChild(el('h3', {}, title));
+    entries.forEach(function (e) {
+      var a = el('a', { href: '#' + e.id });
+      a.appendChild(el('span', {}, e.label));
+      if (e.full) a.appendChild(el('span', { class: 'full' }, e.full));
+      toc.appendChild(a);
+      tocLinks[e.id] = a;
+    });
+  }
+  GROUPS.forEach(function (g) {
+    var entries = docs.filter(function (d) { return d.scope === g.scope; });
+    if (!entries.length) return;
+    tocGroup(g.title, entries.map(function (d) {
+      return { id: d.name, label: d.label, full: d.full_name };
+    }));
+  });
+  tocGroup('Reading the report', [{ id: 'colors', label: 'Colors', full: 'thresholds & n/a' }]);
+
+  // Scrollspy: activate the TOC entry of the card under the reading line —
+  // the last visible card whose top sits above the anchor. A TOC click pins
+  // its own target until the smooth scroll settles, so the highlight never
+  // drifts to the card above the one that was clicked (short cards and
+  // bottom-of-page targets otherwise lose the race).
+  var cards = Array.prototype.slice.call(document.querySelectorAll('article.card'));
+  var spyLock = 0;
+
+  function setActive(id) {
+    Object.keys(tocLinks).forEach(function (key) {
+      tocLinks[key].classList.toggle('active', key === id);
+    });
+    var a = id && tocLinks[id];
+    if (a && a.scrollIntoView) a.scrollIntoView({ block: 'nearest' });
+  }
+
+  function spy() {
+    if (Date.now() < spyLock) return;
+    var anchor = 96;
+    var current = null;
+    var first = null;
+    cards.forEach(function (c) {
+      if (c.hidden) return;
+      if (!first) first = c;
+      if (c.getBoundingClientRect().top <= anchor) current = c;
+    });
+    // At the very bottom the last card may never reach the anchor line.
+    if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 2) {
+      for (var i = cards.length - 1; i >= 0; i--) {
+        if (!cards[i].hidden) { current = cards[i]; break; }
+      }
+    }
+    if (!current) current = first;
+    setActive(current ? current.id : null);
+  }
+
+  // Throttled with a timer, not requestAnimationFrame: rAF stalls in
+  // hidden tabs, which would freeze the highlight until the tab refocuses.
+  var spyPending = false;
+  window.addEventListener('scroll', function () {
+    if (spyPending) return;
+    spyPending = true;
+    setTimeout(function () {
+      spyPending = false;
+      spy();
+    }, 80);
+  }, { passive: true });
+
+  toc.addEventListener('click', function (e) {
+    var a = e.target.closest('a');
+    if (!a) return;
+    spyLock = Date.now() + 900; // outlasts the smooth scroll
+    setActive(a.getAttribute('href').slice(1));
+  });
+
+  spy();
+
+  // ---- search ----
+  var q = document.getElementById('q');
+  var count = document.getElementById('count');
+  var total = document.querySelectorAll('article.card').length;
+
+  function applyFilter() {
+    var needle = q.value.trim().toLowerCase();
+    var shown = 0;
+    document.querySelectorAll('article.card').forEach(function (c) {
+      var hit = !needle || (c.dataset.hay || '').indexOf(needle) >= 0;
+      c.hidden = !hit;
+      if (tocLinks[c.id]) tocLinks[c.id].hidden = !hit;
+      if (hit) shown++;
+    });
+    document.querySelectorAll('section.group').forEach(function (s) {
+      s.hidden = !s.querySelector('article.card:not([hidden])');
+    });
+    count.textContent = shown === total ? total + ' entries' : shown + ' / ' + total + ' entries';
+    spy();
+  }
+  var debounce = null;
+  q.addEventListener('input', function () {
+    clearTimeout(debounce);
+    debounce = setTimeout(applyFilter, 120);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === '/' && document.activeElement !== q && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) {
+      e.preventDefault();
+      q.focus();
+    }
+    if (e.key === 'Escape' && document.activeElement === q) {
+      q.value = '';
+      q.blur();
+      applyFilter();
+    }
+  });
+  applyFilter();
+
+  // ---- footer ----
+  var foot = document.getElementById('foot');
+  var legend = el('span', { class: 'legend' });
+  [['good', 'good'], ['warn', 'mixed'], ['bad', 'review']].forEach(function (pair) {
+    var item = el('span', {});
+    item.appendChild(el('span', { class: 'swatch ' + pair[0], 'aria-hidden': 'true' }));
+    item.appendChild(document.createTextNode(pair[1]));
+    legend.appendChild(item);
+  });
+  foot.appendChild(legend);
+  foot.appendChild(el('span', {}, 'colors are hints, not verdicts — unbounded metrics are judged against their column range'));
+  foot.appendChild(el('span', {}, 'generated by ' + (tool.name || 'reusability') + ' ' + (tool.version || '')));
+
+  document.getElementById('theme-toggle').addEventListener('click', function () {
+    var next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('gm-theme', next); } catch (e) { /* private mode */ }
+  });
+})();
+</script>
+</body>
+</html>

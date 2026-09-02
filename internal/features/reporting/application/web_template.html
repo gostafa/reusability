@@ -1,0 +1,1004 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>reusability report</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23000'/%3E%3Crect x='4' y='4' width='8' height='8' rx='1.5' fill='%23fff'/%3E%3C/svg%3E">
+<script>
+(function () {
+  var t = null;
+  try { t = localStorage.getItem('gm-theme'); } catch (e) {}
+  if (t !== 'light' && t !== 'dark') {
+    t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  document.documentElement.dataset.theme = t;
+})();
+</script>
+<style>
+  :root[data-theme="light"] {
+    --bg: #ffffff; --fg: #000000; --mut: #666666; --faint: #9a9a9a;
+    --line: #e6e6e6; --track: #ededed; --hover: #f6f6f6; --raise: #fafafa;
+    --good: #15803d; --warn: #b45309; --bad: #dc2626;
+  }
+  :root[data-theme="dark"] {
+    --bg: #000000; --fg: #ffffff; --mut: #a0a0a0; --faint: #666666;
+    --line: #242424; --track: #1d1d1d; --hover: #101010; --raise: #0a0a0a;
+    --good: #3fb950; --warn: #f59e0b; --bad: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 1380px; margin: 0 auto; padding: 0 20px 64px; }
+  header.top { padding: 26px 0 6px; }
+  .brand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .brand h1 { margin: 0; font-size: 21px; }
+  .ver, .module, .muted { color: var(--mut); }
+  .module { font-size: 13px; margin-top: 2px; word-break: break-all; }
+  .module b { color: var(--fg); font-weight: 600; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 18px 0 6px; }
+  .tile { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; background: var(--raise); }
+  .tile .n { font-size: 25px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.15; }
+  .tile .l { color: var(--mut); font-size: 12px; margin-top: 2px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 14px 0 12px; }
+  input[type="search"], select {
+    appearance: none; background: var(--bg); color: var(--fg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 6px 11px;
+    font: inherit; font-size: 13px;
+  }
+  input[type="search"] { width: 260px; }
+  input[type="search"]::placeholder { color: var(--faint); }
+  select { max-width: 280px; }
+  .btn, .pill {
+    appearance: none; border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+    border-radius: 8px; padding: 6px 11px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .btn:hover, .pill:hover { background: var(--hover); }
+  .btn.active, .pill.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .pill:disabled { opacity: .45; cursor: default; }
+  .pill:disabled:hover { background: var(--bg); }
+  .theme { font-size: 15px; line-height: 1; padding: 6px 10px; }
+  .check { display: inline-flex; align-items: center; gap: 6px; color: var(--mut); font-size: 13px; cursor: pointer; user-select: none; }
+  .check input { accent-color: var(--fg); }
+  .check.disabled { opacity: .45; cursor: default; }
+  .count { margin-left: auto; color: var(--mut); font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .lvl { display: inline-flex; align-items: center; gap: 7px; }
+  .lvl-label { color: var(--mut); font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; }
+  .pills { display: inline-flex; gap: 4px; }
+  .pill { padding: 5px 10px; min-width: 32px; }
+  .sheet {
+    position: fixed; z-index: 1000; min-width: 170px; background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+    box-shadow: 0 8px 26px rgba(0,0,0,.18); display: grid; gap: 5px;
+  }
+  .sheet[hidden] { display: none; }
+  .tablebar {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0;
+    padding: 10px 12px; background: var(--raise);
+  }
+  .kindbar { display: inline-flex; flex-wrap: wrap; gap: 5px; }
+  .tablewrap {
+    border: 1px solid var(--line); border-radius: 0 0 8px 8px;
+    min-height: 420px; overflow: auto; background: var(--bg);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead { position: sticky; top: 0; z-index: 5; background: var(--bg); }
+  th {
+    text-align: left; color: var(--mut); font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    border-bottom: 1px solid var(--line); padding: 0; white-space: nowrap;
+  }
+  th.num { text-align: right; }
+  .headcell { display: flex; align-items: stretch; min-width: 100%; }
+  .sort {
+    flex: 1 1 auto; min-width: 0; appearance: none; border: 0; background: transparent; color: inherit;
+    padding: 8px; font: inherit; text-transform: inherit; letter-spacing: inherit;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+  }
+  th.num .sort { justify-content: flex-end; }
+  .sort:hover { background: var(--hover); color: var(--fg); }
+  .sortmark { min-width: 10px; color: var(--fg); }
+  .help {
+    position: relative; flex: 0 0 auto; appearance: none; border: 0; background: transparent;
+    color: var(--faint); cursor: help; padding: 0 8px 0 2px; font: inherit;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .help:hover, .help:focus-visible { color: var(--fg); background: var(--hover); }
+  .helpmark {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 15px; height: 15px; border: 1px solid currentColor; border-radius: 50%;
+    font-size: 10px; line-height: 1; text-transform: none; letter-spacing: 0;
+  }
+  .help::after {
+    content: attr(data-help); position: absolute; top: calc(100% + 7px); right: 6px;
+    z-index: 50; display: none; width: max-content; max-width: min(320px, 70vw);
+    white-space: normal; text-align: left; text-transform: none; letter-spacing: 0;
+    font-size: 12px; line-height: 1.35; font-weight: 400;
+    background: var(--fg); color: var(--bg); border-radius: 7px; padding: 8px 10px;
+    box-shadow: 0 8px 26px rgba(0,0,0,.18);
+  }
+  th:first-child .help::after { left: 0; right: auto; }
+  .help:hover::after, .help:focus-visible::after { display: block; }
+  td { border-bottom: 1px solid var(--line); padding: 8px; vertical-align: top; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr:hover td { background: var(--hover); }
+  tbody tr:last-child td { border-bottom: 0; }
+  .row-directory td, .row-package td { font-weight: 600; }
+  .row-directory td { color: var(--mut); background: var(--raise); }
+  .treecell {
+    display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px; align-items: center;
+    min-width: 240px; padding-left: calc(var(--depth) * 18px);
+  }
+  .treecell.item { grid-template-columns: 18px minmax(0, 1fr); font-weight: 400; }
+  .twisty {
+    appearance: none; border: 0; background: transparent; color: var(--mut);
+    width: 18px; height: 18px; padding: 0; cursor: pointer; font: inherit; line-height: 18px;
+  }
+  .twisty[disabled] { cursor: default; color: transparent; }
+  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .itemkind { color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  .metriccell { font-variant-numeric: tabular-nums; }
+  .bar { display: block; width: 100%; height: 3px; margin-top: 5px; background: var(--track); border-radius: 2px; overflow: hidden; }
+  .fill { display: block; height: 100%; background: var(--fg); }
+  .na { color: var(--faint); }
+  .q-good { color: var(--good); }
+  .q-warn { color: var(--warn); }
+  .q-bad { color: var(--bad); }
+  .fill.q-good { background: var(--good); }
+  .fill.q-warn { background: var(--warn); }
+  .fill.q-bad { background: var(--bad); }
+  .empty { color: var(--mut); padding: 24px 8px; text-align: center; }
+  .emptyrow td { color: var(--mut); font-style: italic; }
+  footer { margin-top: 18px; color: var(--faint); font-size: 12px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+  .swatch { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: baseline; }
+  .swatch.good { background: var(--good); }
+  .swatch.warn { background: var(--warn); }
+  .swatch.bad { background: var(--bad); }
+  :focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; border-radius: 4px; }
+  @media (max-width: 820px) {
+    input[type="search"] { width: 100%; }
+    .count { margin-left: 0; width: 100%; }
+    .tablewrap { max-height: none; }
+    .treecell { min-width: 210px; }
+  }
+</style>
+</head>
+<body>
+<script type="application/json" id="report-data">__REPORT_DATA__</script>
+<script type="application/json" id="docs-data">__DOCS_DATA__</script>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1 id="tool-name">reusability</h1>
+      <span class="ver" id="tool-ver"></span>
+    </div>
+    <div class="module" id="module-line"></div>
+  </header>
+
+  <section class="tiles" id="tiles" aria-label="summary"></section>
+
+  <nav class="toolbar" aria-label="controls">
+    <input type="search" id="q" placeholder="Filter packages…  ( / )" aria-label="filter packages">
+    <select id="pkg-filter" aria-label="package filter"></select>
+    <label class="check" id="hide-na-label"><input type="checkbox" id="hide-na"> hide n/a types</label>
+    <button class="btn" id="col-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="col-sheet">Columns</button>
+    <div class="lvl" id="levels">
+      <span class="lvl-label" id="lvl-label">depth</span>
+      <div class="pills" id="level-pills" role="group" aria-labelledby="lvl-label"></div>
+    </div>
+    <span class="count" id="count"></span>
+    <button class="btn theme" id="theme-toggle" title="toggle black / white" aria-label="toggle theme">◐</button>
+  </nav>
+
+  <main id="table-view">
+    <div class="tablebar">
+      <span class="lvl-label" id="kind-label">show</span>
+      <div class="kindbar" id="kind-pills" role="group" aria-labelledby="kind-label"></div>
+      <span class="lvl-label" id="export-label">names</span>
+      <div class="kindbar" id="export-pills" role="group" aria-labelledby="export-label"></div>
+    </div>
+    <div class="tablewrap">
+      <table id="report-table" aria-label="package report table">
+        <thead id="report-head"></thead>
+        <tbody id="report-body"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <footer id="foot"></footer>
+</div>
+<div class="sheet" id="col-sheet" hidden></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var payload = JSON.parse(document.getElementById('report-data').textContent);
+  var docsPayload = JSON.parse(document.getElementById('docs-data').textContent);
+  var modulePath = payload.module || '';
+  var report = payload.report || { packages: [] };
+  var TYPE_ORDER = ['amc', 'lcom', 'tcc', 'cbo', 'reusability'];
+  var PKG_ORDER = ['abstractness', 'instability', 'distance'];
+  var DETAIL_KINDS = [
+    { key: 'packages', label: 'Packages' },
+    { key: 'types', label: 'Types' },
+    { key: 'functions', label: 'Funcs' },
+    { key: 'variables', label: 'Vars' },
+    { key: 'constants', label: 'Consts' }
+  ];
+  var EXPORT_MODES = [
+    { key: 'all', label: 'All' },
+    { key: 'exported', label: 'Exported' }
+  ];
+  var META = {
+    amc: { label: 'AMC', full: 'Average Method Complexity', bounded: false },
+    lcom: { label: 'LCOM', full: 'Lack of Cohesion', bounded: true },
+    tcc: { label: 'TCC', full: 'Tight Class Cohesion', bounded: true },
+    cbo: { label: 'CBO', full: 'Coupling Between Objects', bounded: false },
+    reusability: { label: 'Reuse', full: 'Experimental Reusability Index', bounded: true },
+    abstractness: { label: 'Abst', full: 'Abstractness', bounded: true },
+    instability: { label: 'Inst', full: 'Instability', bounded: true },
+    distance: { label: 'Dist', full: 'Distance from Main Sequence', bounded: true }
+  };
+  var FIELD_HELP = {
+    tree: 'The package tree. In declaration views, package rows provide context and child rows show the selected names.',
+    kind: 'The underlying kind of a named type, such as struct, interface, alias, or other.',
+    exported: 'Whether the name is exported from its package. Exported Go names start with an uppercase letter.',
+    lines: 'The inclusive source line count for the function body, from the func declaration through its end.',
+    cyclomatic: 'Cyclomatic complexity for the function: the number of independent control-flow paths through it.'
+  };
+  var docsByName = {};
+  (docsPayload.docs || []).forEach(function (d) { docsByName[d.name] = d; });
+  var QUALITY = {
+    tcc: { bounded: true },
+    reusability: { bounded: true },
+    lcom: { lowerBetter: true, bounded: true },
+    distance: { lowerBetter: true, bounded: true },
+    amc: { lowerBetter: true },
+    cbo: { lowerBetter: true }
+  };
+
+  function el(tag, attrs, text) {
+    var n = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      if (k === 'class') n.className = attrs[k];
+      else n.setAttribute(k, attrs[k]);
+    });
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  function relPath(path) {
+    if (!modulePath) return path;
+    if (path === modulePath) return '.';
+    if (path.indexOf(modulePath + '/') === 0) return path.slice(modulePath.length + 1);
+    return path;
+  }
+  function fmt(v) { return Number(v).toFixed(2); }
+  function meta(c) { return META[c] || { label: c.toUpperCase(), full: c, bounded: false }; }
+  function helpForColumn(col) {
+    var key = col.metric || col.key;
+    if (col.tree) return FIELD_HELP.tree;
+    var doc = docsByName[key];
+    if (doc) return doc.full_name + ': ' + doc.summary;
+    return FIELD_HELP[key] || col.label;
+  }
+  function columnsOf(list, order) {
+    var present = {};
+    list.forEach(function (m) { Object.keys(m || {}).forEach(function (k) { present[k] = true; }); });
+    var out = order.filter(function (k) { return present[k]; });
+    Object.keys(present).sort().forEach(function (k) { if (order.indexOf(k) < 0) out.push(k); });
+    return out;
+  }
+  function includes(text, query) {
+    return String(text || '').toLowerCase().indexOf(query) >= 0;
+  }
+
+  var packages = (report.packages || []).map(function (p) {
+    return {
+      path: p.path,
+      rel: relPath(p.path),
+      ca: p.afferent || 0,
+      ce: p.efferent || 0,
+      funcs: p.funcs || 0,
+      vars: p.vars || 0,
+      consts: p.consts || 0,
+      variables: p.variables || [],
+      constants: p.constants || [],
+      functions: p.functions || [],
+      metrics: p.metrics || {},
+      types: (p.types || []).map(function (t) {
+        return {
+          pkg: null,
+          name: t.name,
+          exported: !!t.exported,
+          kind: t.kind || 'other',
+          fields: t.fields || 0,
+          methods: t.methods || 0,
+          metrics: t.metrics || {}
+        };
+      })
+    };
+  });
+  packages.forEach(function (p) { p.types.forEach(function (t) { t.pkg = p; }); });
+  var typeRows = [];
+  packages.forEach(function (p) { p.types.forEach(function (t) { typeRows.push(t); }); });
+  var typeCols = columnsOf(typeRows.map(function (t) { return t.metrics; }), TYPE_ORDER);
+  var pkgCols = columnsOf(packages.map(function (p) { return p.metrics; }), PKG_ORDER);
+  var colRange = {};
+  typeCols.forEach(function (c) {
+    var mn = Infinity, mx = -Infinity;
+    typeRows.forEach(function (t) {
+      var m = t.metrics[c];
+      if (m && m.applicable) { mn = Math.min(mn, m.value); mx = Math.max(mx, m.value); }
+    });
+    colRange[c] = { min: mn, max: mx };
+  });
+  function qualityClass(col, value) {
+    var q = QUALITY[col];
+    if (!q) return '';
+    var score;
+    if (q.bounded) score = Math.max(0, Math.min(1, value));
+    else {
+      var r = colRange[col];
+      if (!r || r.max === r.min || r.min === Infinity) return '';
+      score = (value - r.min) / (r.max - r.min);
+    }
+    if (q.lowerBetter) score = 1 - score;
+    return score >= 0.66 ? 'q-good' : score >= 0.33 ? 'q-warn' : 'q-bad';
+  }
+  function frac(col, value) {
+    if (meta(col).bounded) return Math.max(0, Math.min(1, value));
+    var r = colRange[col];
+    return r && r.max > 0 ? Math.max(0, Math.min(1, value / r.max)) : 0;
+  }
+
+  function dirNode(name, path) {
+    return { name: name, path: path, pkg: null, children: [], map: {} };
+  }
+  function packageHierarchy() {
+    var root = dirNode('', '');
+    packages.forEach(function (p) {
+      if (p.rel === '.') { root.pkg = p; return; }
+      var cur = root;
+      p.rel.split('/').forEach(function (seg) {
+        if (!cur.map[seg]) {
+          var child = dirNode(seg, cur.path ? cur.path + '/' + seg : seg);
+          cur.map[seg] = child;
+          cur.children.push(child);
+        }
+        cur = cur.map[seg];
+      });
+      cur.pkg = p;
+    });
+    function compress(n) {
+      while (!n.pkg && n.children.length === 1) {
+        var c = n.children[0];
+        n.name = n.name ? n.name + '/' + c.name : c.name;
+        n.path = c.path;
+        n.pkg = c.pkg;
+        n.children = c.children;
+        n.map = c.map;
+      }
+      n.children.forEach(compress);
+    }
+    root.children.forEach(compress);
+    return root;
+  }
+  function treeNode(id, kind, label, pkg, children, search) {
+    return { id: id, kind: kind, label: label, pkg: pkg || null, children: children || [], search: search || label };
+  }
+  function convertDir(d) {
+    var children = d.children
+      .sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; })
+      .map(convertDir);
+    if (d.pkg) {
+      return treeNode('pkg:' + d.pkg.path, 'package', d.pkg.rel, d.pkg, children, d.pkg.path + ' ' + d.pkg.rel);
+    }
+    return treeNode('dir:' + (d.path || '.'), 'directory', d.name || '.', null, children, d.path);
+  }
+  var roots = [];
+  var raw = packageHierarchy();
+  if (raw.pkg) {
+    roots.push(treeNode('pkg:' + raw.pkg.path, 'package', raw.pkg.rel, raw.pkg, raw.children.map(convertDir), raw.pkg.path + ' ' + raw.pkg.rel));
+  } else {
+    roots = raw.children.map(convertDir);
+  }
+
+  var state = {
+    q: '',
+    pkg: '',
+    detail: 'types',
+    exportMode: 'all',
+    hideNA: false,
+    hidden: {},
+    collapsed: {},
+    level: 'all',
+    sort: { key: 'tree', dir: 'asc' }
+  };
+
+  function visibleType(t) {
+    if (!state.hideNA) return true;
+    return typeCols.filter(function (c) { return !state.hidden[c]; }).every(function (c) {
+      var m = t.metrics[c];
+      return m && m.applicable;
+    });
+  }
+  function visibleExported(row) {
+    return state.exportMode !== 'exported' || row.exported;
+  }
+  function detailRows(pkg) {
+    if (state.detail === 'packages') return [];
+    if (state.detail === 'variables') {
+      return pkg.variables.map(function (d) { return { kind: 'variable', pkg: pkg, item: d, name: d.name, exported: !!d.exported }; }).filter(visibleExported);
+    }
+    if (state.detail === 'constants') {
+      return pkg.constants.map(function (d) { return { kind: 'constant', pkg: pkg, item: d, name: d.name, exported: !!d.exported }; }).filter(visibleExported);
+    }
+    if (state.detail === 'functions') {
+      return pkg.functions.map(function (f) {
+        return { kind: 'function', pkg: pkg, item: f, name: f.name, exported: !!f.exported, lines: f.lines || 0, cyclomatic: f.cyclomatic || 0 };
+      }).filter(visibleExported);
+    }
+    return pkg.types.filter(visibleType).map(function (t) {
+      return {
+        kind: 'type', pkg: pkg, item: t, name: t.name, itemKind: t.kind,
+        exported: !!t.exported, fields: t.fields || 0,
+        methods: t.methods || 0, metrics: t.metrics || {}
+      };
+    }).filter(visibleExported);
+  }
+  function rowSearch(row) {
+    var parts = [row.pkg.path, row.pkg.rel, row.name, row.kind, row.itemKind || ''];
+    return parts.join(' ');
+  }
+  function packageMatches(pkg) {
+    return !state.q || includes(pkg.path + ' ' + pkg.rel, state.q);
+  }
+  function prune(n) {
+    var kids = n.children.map(prune).filter(Boolean);
+    if (n.kind === 'directory') {
+      var dirMatches = !state.pkg && (!state.q || includes(n.search, state.q));
+      if (dirMatches || kids.length) {
+        var dirCopy = Object.assign({}, n);
+        dirCopy.children = kids;
+        return dirCopy;
+      }
+      return null;
+    }
+
+    var pkgAllowed = !state.pkg || n.pkg.path === state.pkg;
+    var pkgMatches = pkgAllowed && packageMatches(n.pkg);
+    var rows = pkgAllowed ? detailRows(n.pkg) : [];
+    if (state.q && !pkgMatches) {
+      rows = rows.filter(function (r) { return includes(rowSearch(r), state.q); });
+    }
+    if (pkgMatches || rows.length || kids.length) {
+      var pkgCopy = Object.assign({}, n);
+      pkgCopy.children = kids;
+      pkgCopy.details = rows;
+      pkgCopy.includePackage = pkgMatches;
+      pkgCopy.showEmpty = state.detail !== 'packages' && pkgMatches && !rows.length;
+      return pkgCopy;
+    }
+    return null;
+  }
+
+  function activeColumns() {
+    var cols = [{ key: 'tree', label: state.detail === 'packages' ? 'Package' : 'Package / Name', type: 'text', tree: true }];
+    if (state.detail === 'packages') {
+      cols = cols.concat([
+        { key: 'funcs', label: 'Funcs', type: 'number', pkg: true },
+        { key: 'vars', label: 'Vars', type: 'number', pkg: true },
+        { key: 'consts', label: 'Consts', type: 'number', pkg: true },
+        { key: 'types', label: 'Types', type: 'number', pkg: true },
+        { key: 'ca', label: 'Ca', type: 'number', pkg: true },
+        { key: 'ce', label: 'Ce', type: 'number', pkg: true }
+      ]);
+      pkgCols.forEach(function (c) {
+        if (!state.hidden[c]) cols.push({ key: 'pkg:' + c, metric: c, label: meta(c).label, title: meta(c).full, type: 'number', pkgMetric: true });
+      });
+      return cols;
+    }
+    if (state.detail === 'types') {
+      cols = cols.concat([
+        { key: 'kind', label: 'Kind', type: 'text', item: true },
+        { key: 'exported', label: 'Exported', type: 'boolean', item: true },
+        { key: 'fields', label: 'Fields', type: 'number', item: true },
+        { key: 'methods', label: 'Methods', type: 'number', item: true }
+      ]);
+      typeCols.forEach(function (c) {
+        if (!state.hidden[c]) cols.push({ key: 'type:' + c, metric: c, label: meta(c).label, title: meta(c).full, type: 'number', typeMetric: true });
+      });
+    } else if (state.detail === 'functions') {
+      cols = cols.concat([
+        { key: 'exported', label: 'Exported', type: 'boolean', item: true },
+        { key: 'lines', label: 'Lines', type: 'number', item: true },
+        { key: 'cyclomatic', label: 'Cyclo', type: 'number', item: true }
+      ]);
+    } else {
+      cols = cols.concat([
+        { key: 'exported', label: 'Exported', type: 'boolean', item: true }
+      ]);
+    }
+    return cols;
+  }
+  function metricValue(metrics, name) {
+    var m = metrics && metrics[name];
+    return m && m.applicable ? m.value : null;
+  }
+  function emptySummary() {
+    return {
+      pkgCount: 0, funcs: 0, vars: 0, consts: 0, types: 0, ca: 0, ce: 0,
+      pkgMetrics: {}, details: 0, exported: 0,
+      fields: { sum: 0, count: 0 },
+      methods: { sum: 0, count: 0 },
+      lines: { sum: 0, count: 0 },
+      cyclomatic: { sum: 0, count: 0 },
+      typeMetrics: {}
+    };
+  }
+  function addStat(stat, value) {
+    if (value === null || value === undefined || value === '') return;
+    stat.sum += Number(value);
+    stat.count++;
+  }
+  function addMetricStat(stats, name, value) {
+    if (value === null || value === undefined) return;
+    if (!stats[name]) stats[name] = { sum: 0, count: 0 };
+    addStat(stats[name], value);
+  }
+  function meanStat(stat) {
+    return stat && stat.count ? stat.sum / stat.count : null;
+  }
+  function mergeStat(dst, src) {
+    dst.sum += src.sum;
+    dst.count += src.count;
+  }
+  function mergeMetricStats(dst, src) {
+    Object.keys(src).forEach(function (name) {
+      if (!dst[name]) dst[name] = { sum: 0, count: 0 };
+      mergeStat(dst[name], src[name]);
+    });
+  }
+  function addPackageSummary(summary, pkg) {
+    summary.pkgCount++;
+    summary.funcs += pkg.funcs;
+    summary.vars += pkg.vars;
+    summary.consts += pkg.consts;
+    summary.types += pkg.types.length;
+    summary.ca += pkg.ca;
+    summary.ce += pkg.ce;
+    pkgCols.forEach(function (name) { addMetricStat(summary.pkgMetrics, name, metricValue(pkg.metrics, name)); });
+  }
+  function addDetailSummary(summary, row) {
+    summary.details++;
+    if (row.exported) summary.exported++;
+    if (row.kind === 'type') {
+      addStat(summary.fields, row.fields);
+      addStat(summary.methods, row.methods);
+      typeCols.forEach(function (name) { addMetricStat(summary.typeMetrics, name, metricValue(row.metrics, name)); });
+    } else if (row.kind === 'function') {
+      addStat(summary.lines, row.lines);
+      addStat(summary.cyclomatic, row.cyclomatic);
+    }
+  }
+  function mergeSummary(dst, src) {
+    dst.pkgCount += src.pkgCount;
+    dst.funcs += src.funcs;
+    dst.vars += src.vars;
+    dst.consts += src.consts;
+    dst.types += src.types;
+    dst.ca += src.ca;
+    dst.ce += src.ce;
+    dst.details += src.details;
+    dst.exported += src.exported;
+    mergeStat(dst.fields, src.fields);
+    mergeStat(dst.methods, src.methods);
+    mergeStat(dst.lines, src.lines);
+    mergeStat(dst.cyclomatic, src.cyclomatic);
+    mergeMetricStats(dst.pkgMetrics, src.pkgMetrics);
+    mergeMetricStats(dst.typeMetrics, src.typeMetrics);
+  }
+  function summarizeNode(n) {
+    var summary = emptySummary();
+    if (n.kind === 'package') {
+      if (n.includePackage) addPackageSummary(summary, n.pkg);
+      (n.details || []).forEach(function (row) { addDetailSummary(summary, row); });
+    }
+    n.children.forEach(function (child) { mergeSummary(summary, summarizeNode(child)); });
+    n.summary = summary;
+    return summary;
+  }
+  function aggregateMetricValue(stats, name) {
+    return meanStat(stats && stats[name]);
+  }
+  function valueForTreeNode(n, key) {
+    if (key === 'tree') return n.label;
+    var summary = n.summary;
+    if (!summary) return null;
+    if (state.detail === 'packages') {
+      if (key === 'funcs') return summary.funcs;
+      if (key === 'vars') return summary.vars;
+      if (key === 'consts') return summary.consts;
+      if (key === 'types') return summary.types;
+      if (key === 'ca') return summary.ca;
+      if (key === 'ce') return summary.ce;
+      if (key.indexOf('pkg:') === 0) return aggregateMetricValue(summary.pkgMetrics, key.slice(4));
+    } else {
+      if (key === 'exported') return summary.details ? summary.exported / summary.details : null;
+      if (key === 'fields') return meanStat(summary.fields);
+      if (key === 'methods') return meanStat(summary.methods);
+      if (key === 'lines') return meanStat(summary.lines);
+      if (key === 'cyclomatic') return meanStat(summary.cyclomatic);
+      if (key.indexOf('type:') === 0) return aggregateMetricValue(summary.typeMetrics, key.slice(5));
+    }
+    return null;
+  }
+  function valueForDetailRow(r, key) {
+    if (key === 'tree') return r.name;
+    if (key === 'kind') return r.itemKind || r.kind;
+    if (key === 'exported') return r.exported ? 1 : 0;
+    if (key === 'fields') return r.fields;
+    if (key === 'methods') return r.methods;
+    if (key === 'lines') return r.lines;
+    if (key === 'cyclomatic') return r.cyclomatic;
+    if (key.indexOf('type:') === 0) return metricValue(r.metrics, key.slice(5));
+    return null;
+  }
+  function compareRaw(a, b, type) {
+    var ae = a === null || a === undefined || a === '';
+    var be = b === null || b === undefined || b === '';
+    if (ae && be) return 0;
+    if (ae) return 1;
+    if (be) return -1;
+    if (type === 'number' || type === 'boolean') return Number(a) - Number(b);
+    a = String(a).toLowerCase();
+    b = String(b).toLowerCase();
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+  function columnFor(key) {
+    return activeColumns().filter(function (c) { return c.key === key; })[0] || activeColumns()[0];
+  }
+  function compareBySort(a, b, valueFn) {
+    var col = columnFor(state.sort.key);
+    var cmp = compareRaw(valueFn(a, state.sort.key), valueFn(b, state.sort.key), col.type);
+    if (cmp === 0) cmp = compareRaw(valueFn(a, 'tree'), valueFn(b, 'tree'), 'text');
+    return state.sort.dir === 'desc' ? -cmp : cmp;
+  }
+  function sortedTree(nodes) {
+    return nodes.slice().sort(function (a, b) {
+      return compareBySort(a, b, valueForTreeNode);
+    });
+  }
+  function sortedDetails(rows) {
+    return rows.slice().sort(function (a, b) {
+      return compareBySort(a, b, valueForDetailRow);
+    });
+  }
+
+  function metricCell(name, metrics) {
+    var m = metrics && metrics[name];
+    if (!m || !m.applicable) return el('span', { class: 'na', title: m && m.reason ? m.reason : 'not applicable' }, '–');
+    var qc = qualityClass(name, m.value);
+    var wrap = el('span', { class: 'metriccell' + (qc ? ' ' + qc : ''), title: meta(name).full + (m.definition ? '\n' + m.definition : '') });
+    wrap.appendChild(document.createTextNode(fmt(m.value)));
+    var bar = el('span', { class: 'bar', 'aria-hidden': 'true' });
+    bar.appendChild(el('span', { class: 'fill' + (qc ? ' ' + qc : ''), style: 'width:' + (frac(name, m.value) * 100).toFixed(1) + '%' }));
+    wrap.appendChild(bar);
+    return wrap;
+  }
+  function aggregateMetricCell(name, stats) {
+    var value = aggregateMetricValue(stats, name);
+    if (value === null || value === undefined) return el('span', { class: 'na', title: 'no applicable values' }, '–');
+    var qc = qualityClass(name, value);
+    var wrap = el('span', { class: 'metriccell' + (qc ? ' ' + qc : ''), title: 'mean ' + meta(name).full });
+    wrap.appendChild(document.createTextNode(fmt(value)));
+    var bar = el('span', { class: 'bar', 'aria-hidden': 'true' });
+    bar.appendChild(el('span', { class: 'fill' + (qc ? ' ' + qc : ''), style: 'width:' + (frac(name, value) * 100).toFixed(1) + '%' }));
+    wrap.appendChild(bar);
+    return wrap;
+  }
+  function aggregateText(col, node) {
+    var value = valueForTreeNode(node, col.key);
+    if (value === null || value === undefined || value === '') return '–';
+    if (col.key === 'exported') return Math.round(value * 100) + '%';
+    if (state.detail === 'packages') return String(value);
+    return fmt(value);
+  }
+  function treeCell(label, depth, rowKind, hasChildren, collapsed, title, toggle) {
+    var isItem = rowKind !== 'directory' && rowKind !== 'package';
+    var wrap = el('div', { class: 'treecell' + (isItem ? ' item' : ''), style: '--depth:' + depth, title: title || label });
+    var btn = el('button', { class: 'twisty', type: 'button', 'aria-label': collapsed ? 'expand row' : 'collapse row' }, hasChildren ? (collapsed ? '▸' : '▾') : '');
+    if (!hasChildren) btn.setAttribute('disabled', 'disabled');
+    if (hasChildren) btn.addEventListener('click', toggle);
+    wrap.appendChild(btn);
+    var name = el('span', { class: 'name' });
+    if (isItem) name.appendChild(el('span', { class: 'itemkind' }, rowKind + ' '));
+    name.appendChild(document.createTextNode(label));
+    wrap.appendChild(name);
+    return wrap;
+  }
+  function appendCell(tr, col, row, node, depth) {
+    var td = el('td', { class: col.type === 'number' || col.type === 'boolean' ? 'num' : '' });
+    if (col.tree) {
+      if (row.type === 'tree') {
+        td.appendChild(treeCell(node.label, depth, node.kind, node.children.length || (node.kind === 'package' && state.detail !== 'packages'), !!state.collapsed[node.id], node.search, function () {
+          state.collapsed[node.id] = !state.collapsed[node.id];
+          paint();
+        }));
+      } else {
+        td.appendChild(treeCell(row.data.name, depth, row.data.kind, false, false, row.data.pkg.path + ' ' + row.data.name));
+      }
+    } else if (row.type === 'tree') {
+      if (col.key === 'kind') td.textContent = '';
+      else if (col.pkgMetric) td.appendChild(aggregateMetricCell(col.metric, node.summary && node.summary.pkgMetrics));
+      else if (col.typeMetric) td.appendChild(aggregateMetricCell(col.metric, node.summary && node.summary.typeMetrics));
+      else td.textContent = aggregateText(col, node);
+    } else if (row.type === 'detail') {
+      var d = row.data;
+      if (col.key === 'kind') td.textContent = d.itemKind || d.kind;
+      else if (col.key === 'exported') td.textContent = d.exported ? 'yes' : 'no';
+      else if (col.key === 'fields') td.textContent = String(d.fields);
+      else if (col.key === 'methods') td.textContent = String(d.methods);
+      else if (col.key === 'lines') td.textContent = String(d.lines);
+      else if (col.key === 'cyclomatic') td.textContent = String(d.cyclomatic);
+      else if (col.typeMetric) td.appendChild(metricCell(col.metric, d.metrics));
+    }
+    tr.appendChild(td);
+  }
+  function renderHead(cols) {
+    var head = document.getElementById('report-head');
+    head.textContent = '';
+    var tr = el('tr');
+    cols.forEach(function (col) {
+      var th = el('th', { class: col.type === 'number' || col.type === 'boolean' ? 'num' : '', 'data-sort': col.key });
+      if (col.title) th.setAttribute('title', col.title);
+      th.setAttribute('aria-sort', state.sort.key === col.key ? (state.sort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+      var cell = el('span', { class: 'headcell' });
+      var btn = el('button', { class: 'sort', type: 'button', 'data-sort': col.key });
+      btn.appendChild(document.createTextNode(col.label));
+      btn.appendChild(el('span', { class: 'sortmark', 'aria-hidden': 'true' }, state.sort.key === col.key ? (state.sort.dir === 'asc' ? '↑' : '↓') : ''));
+      btn.addEventListener('click', function () {
+        if (state.sort.key === col.key) state.sort.dir = state.sort.dir === 'asc' ? 'desc' : 'asc';
+        else state.sort = { key: col.key, dir: col.type === 'text' ? 'asc' : 'desc' };
+        paint();
+      });
+      cell.appendChild(btn);
+      var help = el('button', {
+        class: 'help',
+        type: 'button',
+        'aria-label': col.label + ' help',
+        'data-help': helpForColumn(col)
+      });
+      help.appendChild(el('span', { class: 'helpmark', 'aria-hidden': 'true' }, '?'));
+      cell.appendChild(help);
+      th.appendChild(cell);
+      tr.appendChild(th);
+    });
+    head.appendChild(tr);
+  }
+  function renderTable() {
+    var cols = activeColumns();
+    var body = document.getElementById('report-body');
+    var visible = roots.map(prune).filter(Boolean);
+    var rowCount = 0;
+    visible.forEach(function (n) { summarizeNode(n); });
+    body.textContent = '';
+    renderHead(cols);
+
+    function emitTreeNode(n, depth) {
+      rowCount++;
+      var tr = el('tr', { class: 'row-' + n.kind });
+      cols.forEach(function (col) { appendCell(tr, col, { type: 'tree' }, n, depth); });
+      body.appendChild(tr);
+      if (state.collapsed[n.id]) return;
+
+      if (n.kind === 'package' && state.detail !== 'packages') {
+        var rows = sortedDetails(n.details || []);
+        if (rows.length) {
+          rows.forEach(function (d) {
+            rowCount++;
+            var itemTr = el('tr', { class: 'row-item row-' + d.kind });
+            cols.forEach(function (col) { appendCell(itemTr, col, { type: 'detail', data: d }, n, depth + 1); });
+            body.appendChild(itemTr);
+          });
+        } else if (n.showEmpty) {
+          rowCount++;
+          var emptyTr = el('tr', { class: 'emptyrow' });
+          var emptyTd = el('td', { colspan: String(cols.length) }, 'No entries');
+          emptyTr.appendChild(emptyTd);
+          body.appendChild(emptyTr);
+        }
+      }
+      sortedTree(n.children).forEach(function (child) { emitTreeNode(child, depth + 1); });
+    }
+
+    sortedTree(visible).forEach(function (n) { emitTreeNode(n, 0); });
+    if (!visible.length) {
+      var tr = el('tr');
+      tr.appendChild(el('td', { colspan: String(cols.length), class: 'empty' }, packages.length ? 'nothing matches the current filters' : 'no packages were analyzed'));
+      body.appendChild(tr);
+    }
+    document.getElementById('count').textContent = rowCount + ' table rows';
+  }
+  function paint() {
+    renderTable();
+    syncLevelPills();
+    syncKindPills();
+    syncExportPills();
+    syncHideNA();
+  }
+
+  var tool = report.tool || { name: 'reusability', version: '' };
+  document.getElementById('tool-name').textContent = tool.name || 'reusability';
+  document.getElementById('tool-ver').textContent = (tool.version ? tool.version + ' · ' : '') + 'schema ' + (report.schema_version || '?');
+  var modLine = document.getElementById('module-line');
+  if (modulePath) {
+    modLine.appendChild(document.createTextNode('module '));
+    modLine.appendChild(el('b', {}, modulePath));
+    document.title = modulePath + ' — reusability';
+  } else {
+    modLine.textContent = 'module unknown';
+  }
+  function tile(value, label) {
+    var t = el('div', { class: 'tile' });
+    t.appendChild(el('div', { class: 'n' }, String(value)));
+    t.appendChild(el('div', { class: 'l' }, label));
+    return t;
+  }
+  var tiles = document.getElementById('tiles');
+  tiles.appendChild(tile(packages.length, 'packages'));
+  tiles.appendChild(tile(typeRows.length, 'types'));
+  tiles.appendChild(tile(packages.reduce(function (s, p) { return s + p.funcs; }, 0), 'functions and methods'));
+  tiles.appendChild(tile(packages.reduce(function (s, p) { return s + p.vars; }, 0), 'variables'));
+  tiles.appendChild(tile(packages.reduce(function (s, p) { return s + p.consts; }, 0), 'constants'));
+
+  var kindPills = document.getElementById('kind-pills');
+  DETAIL_KINDS.forEach(function (kind) {
+    var p = el('button', { class: 'pill', type: 'button', 'data-kind': kind.key }, kind.label);
+    p.addEventListener('click', function () {
+      state.detail = kind.key;
+      state.sort = { key: 'tree', dir: 'asc' };
+      paint();
+    });
+    kindPills.appendChild(p);
+  });
+  var exportPills = document.getElementById('export-pills');
+  EXPORT_MODES.forEach(function (mode) {
+    var p = el('button', { class: 'pill', type: 'button', 'data-export': mode.key }, mode.label);
+    p.addEventListener('click', function () {
+      state.exportMode = mode.key;
+      paint();
+    });
+    exportPills.appendChild(p);
+  });
+  function syncKindPills() {
+    kindPills.querySelectorAll('.pill').forEach(function (p) { p.classList.toggle('active', state.detail === p.dataset.kind); });
+  }
+  function syncExportPills() {
+    var disabled = state.detail === 'packages';
+    exportPills.querySelectorAll('.pill').forEach(function (p) {
+      p.disabled = disabled;
+      p.classList.toggle('active', state.exportMode === p.dataset.export);
+    });
+  }
+  function syncHideNA() {
+    var box = document.getElementById('hide-na');
+    var lab = document.getElementById('hide-na-label');
+    box.disabled = state.detail !== 'types';
+    lab.classList.toggle('disabled', box.disabled);
+  }
+
+  var pkgFilter = document.getElementById('pkg-filter');
+  pkgFilter.appendChild(el('option', { value: '' }, 'all packages'));
+  packages.slice().sort(function (a, b) { return a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0; }).forEach(function (p) {
+    pkgFilter.appendChild(el('option', { value: p.path }, p.rel));
+  });
+  pkgFilter.addEventListener('change', function () { state.pkg = pkgFilter.value; paint(); });
+  var q = document.getElementById('q');
+  var debounce = null;
+  q.addEventListener('input', function () {
+    clearTimeout(debounce);
+    debounce = setTimeout(function () { state.q = q.value.trim().toLowerCase(); paint(); }, 120);
+  });
+  document.getElementById('hide-na').addEventListener('change', function (e) { state.hideNA = e.target.checked; paint(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === '/' && document.activeElement !== q && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) {
+      e.preventDefault(); q.focus();
+    }
+    if (e.key === 'Escape' && document.activeElement === q) {
+      q.value = ''; state.q = ''; q.blur(); paint();
+    }
+  });
+
+  var sheet = document.getElementById('col-sheet');
+  var colBtn = document.getElementById('col-btn');
+  typeCols.concat(pkgCols).forEach(function (c) {
+    var lab = el('label', { class: 'check', title: meta(c).full });
+    var box = el('input', { type: 'checkbox' });
+    box.checked = true;
+    box.addEventListener('change', function () {
+      if (box.checked) delete state.hidden[c];
+      else state.hidden[c] = true;
+      paint();
+    });
+    lab.appendChild(box);
+    lab.appendChild(document.createTextNode(meta(c).label));
+    sheet.appendChild(lab);
+  });
+  function closeSheet() {
+    sheet.hidden = true;
+    colBtn.classList.remove('active');
+    colBtn.setAttribute('aria-expanded', 'false');
+  }
+  function positionSheet() {
+    var r = colBtn.getBoundingClientRect();
+    sheet.style.top = (r.bottom + 6) + 'px';
+    sheet.style.left = Math.max(12, Math.min(r.left, window.innerWidth - sheet.offsetWidth - 12)) + 'px';
+  }
+  colBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (!sheet.hidden) { closeSheet(); return; }
+    sheet.hidden = false;
+    colBtn.classList.add('active');
+    colBtn.setAttribute('aria-expanded', 'true');
+    positionSheet();
+  });
+  document.addEventListener('click', function (e) { if (!sheet.hidden && !sheet.contains(e.target)) closeSheet(); });
+  window.addEventListener('resize', closeSheet);
+  window.addEventListener('scroll', function () { if (!sheet.hidden) positionSheet(); }, { passive: true });
+
+  var levelPills = document.getElementById('level-pills');
+  var maxDepth = 1;
+  function scan(n, depth) {
+    maxDepth = Math.max(maxDepth, depth);
+    n.children.forEach(function (c) { scan(c, depth + 1); });
+  }
+  roots.forEach(function (n) { scan(n, 1); });
+  function setCollapsedForLevel(level) {
+    state.level = level;
+    state.collapsed = {};
+    if (level !== 'all') {
+      function walk(n, depth) {
+        if (n.children.length && depth >= level) state.collapsed[n.id] = true;
+        n.children.forEach(function (c) { walk(c, depth + 1); });
+      }
+      roots.forEach(function (n) { walk(n, 1); });
+    }
+    paint();
+  }
+  function syncLevelPills() {
+    levelPills.querySelectorAll('.pill').forEach(function (p) { p.classList.toggle('active', String(state.level) === p.dataset.level); });
+  }
+  for (var i = 1; i <= Math.min(maxDepth, 6); i++) {
+    (function (level) {
+      var p = el('button', { class: 'pill', type: 'button', 'data-level': String(level) }, String(level));
+      p.addEventListener('click', function () { setCollapsedForLevel(level); });
+      levelPills.appendChild(p);
+    })(i);
+  }
+  var all = el('button', { class: 'pill', type: 'button', 'data-level': 'all' }, 'All');
+  all.addEventListener('click', function () { setCollapsedForLevel('all'); });
+  levelPills.appendChild(all);
+
+  document.getElementById('theme-toggle').addEventListener('click', function () {
+    var next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('gm-theme', next); } catch (e) {}
+  });
+  var foot = document.getElementById('foot');
+  [['good', 'good'], ['warn', 'mixed'], ['bad', 'review']].forEach(function (pair) {
+    var item = el('span');
+    item.appendChild(el('span', { class: 'swatch ' + pair[0], 'aria-hidden': 'true' }));
+    item.appendChild(document.createTextNode(pair[1]));
+    foot.appendChild(item);
+  });
+  foot.appendChild(el('span', {}, 'colors are hints, not verdicts'));
+  foot.appendChild(el('span', {}, 'generated by ' + (tool.name || 'reusability') + ' ' + (tool.version || '')));
+  paint();
+})();
+</script>
+</body>
+</html>
