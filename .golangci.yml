@@ -21,8 +21,8 @@ linters:
             testability: 0.25
             documentation: 0.15
           rules:
-            - pattern: ./...
-              min: 0.1
+            - pattern: '**'
+              min: 0.8
     asasalint:
       exclude: []
       use-builtin-exclusions: false
