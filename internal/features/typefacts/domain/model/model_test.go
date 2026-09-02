@@ -24,7 +24,7 @@ func TestMethodFactsString(t *testing.T) {
 		CalledSiblings: []int{1, 3},
 	}
 
-	got := facts.String()
+	got := methodFactsString(facts)
 	for _, want := range []string{
 		`method "Save"`,
 		"exported true",

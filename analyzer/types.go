@@ -12,14 +12,9 @@ import (
 )
 
 type (
-	reportAnalyzer interface {
-		// Analyze evaluates one reusability configuration.
-		Analyze(ctx context.Context, cfg *reusability.Config) (reusability.Report, error)
-	}
+	reportAnalyzer = func(ctx context.Context, cfg *reusability.Config) (reusability.Report, error)
 
-	analyzeFunc func(ctx context.Context, cfg *reusability.Config) (reusability.Report, error)
-
-	runner struct {
+	runner = struct {
 		analyzer reportAnalyzer
 		err      error
 		byPkg    map[string][]policydomain.Violation
@@ -38,7 +33,7 @@ type (
 	}
 
 	// Settings configures the golangci-lint / go/analysis adapter.
-	Settings struct {
+	Settings = struct {
 		// ReusabilityWeights optionally overrides component score weights.
 		ReusabilityWeights *ReusabilityWeightSettings `json:"reusability_weights"`
 		// Directory is the module root used for analysis (empty = cwd).

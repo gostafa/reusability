@@ -9,7 +9,7 @@ import (
 
 type (
 	// FunctionFacts describes a package-level function.
-	FunctionFacts struct {
+	FunctionFacts = struct {
 		// Name is the function identifier.
 		Name string
 		// Pos is the source location of the function.
@@ -23,7 +23,7 @@ type (
 	}
 
 	// MethodFacts describes one method of a named type.
-	MethodFacts struct {
+	MethodFacts = struct {
 		Name           string
 		FieldsUsed     bitset.FieldSet
 		CalledSiblings []int

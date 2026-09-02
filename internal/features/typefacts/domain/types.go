@@ -9,7 +9,7 @@ import (
 
 type (
 	// PackageExtract is one package's raw extraction before ID assignment.
-	PackageExtract struct {
+	PackageExtract = struct {
 		// Path is the package import path.
 		Path string
 		// Imports lists import paths referenced by the package.
@@ -21,7 +21,7 @@ type (
 	}
 
 	// TypeExtract is one named type's raw extraction before ID assignment.
-	TypeExtract struct {
+	TypeExtract = struct {
 		Name                      string
 		Fields                    []FieldFacts
 		Methods                   []MethodFacts

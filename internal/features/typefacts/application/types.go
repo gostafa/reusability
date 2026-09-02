@@ -11,7 +11,7 @@ import (
 )
 
 type (
-	typeBuild struct {
+	typeBuild = struct {
 		idByKey map[string]int
 		extract domain.TypeExtract
 		id      int

@@ -42,7 +42,7 @@ const (
 	two                   = 2
 	defaultWeightCohesion = 0.30
 	defaultWeightCoupling = 0.35
-	defaultWeightTest    = 0.20
+	defaultWeightTest     = 0.20
 	defaultWeightDocs     = 0.15
 
 	reasonNoMethods = "type has no methods"

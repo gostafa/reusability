@@ -6,7 +6,9 @@ package reusability
 import (
 	"context"
 	"math"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 
@@ -316,4 +318,35 @@ func TestAllMetrics(t *testing.T) {
 	if def := DefaultMetrics(); len(def) != 1 || def[0] != MetricReusability {
 		t.Fatalf("DefaultMetrics() = %v", def)
 	}
+}
+
+func TestRepositoryMeetsUniformReusabilityPolicy(t *testing.T) {
+	root, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatalf("resolve repository root: %v", err)
+	}
+
+	report, err := Analyze(context.Background(), &Config{
+		Directory: root,
+		Patterns:  []string{"./..."},
+	})
+	if err != nil {
+		t.Fatalf("analyze repository: %v", err)
+	}
+
+	var items []string
+	for i := range report.Packages {
+		pkg := &report.Packages[i]
+		for j := range pkg.Types {
+			typ := &pkg.Types[j]
+			if typ.Reusability.Applicable && typ.Reusability.Value < 0.60 {
+				items = append(items, pkg.Path+"."+typ.Name)
+			}
+		}
+	}
+	if len(items) == 0 {
+		return
+	}
+
+	t.Fatalf("uniform reusability policy violations: %s", strings.Join(items, ", "))
 }

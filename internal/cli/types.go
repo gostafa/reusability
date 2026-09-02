@@ -11,7 +11,7 @@ import (
 )
 
 type (
-	ruleSpec struct {
+	ruleSpec = struct {
 		pattern string
 		minimum float64
 	}
@@ -20,7 +20,7 @@ type (
 		items []ruleSpec
 	}
 
-	flagValues struct {
+	flagValues = struct {
 		format                         *string
 		webReport                      *bool
 		output                         *string
@@ -46,7 +46,7 @@ type (
 
 	// runtimeConfig holds parsed CLI runtime state. Named module types are
 	// limited to analysis config so coupling stays low.
-	runtimeConfig struct {
+	runtimeConfig = struct {
 		logger        *slog.Logger
 		format        string
 		output        string
@@ -61,32 +61,32 @@ type (
 		webToDefault  bool
 	}
 
-	parseResult struct {
+	parseResult = struct {
 		cfg  runtimeConfig
 		code int
 		done bool
 	}
 
-	gatingResult struct {
+	gatingResult = struct {
 		source string
 		rules  []ruleSpec
 		code   int
 		ok     bool
 	}
 
-	formatResult struct {
+	formatResult = struct {
 		format string
 		code   int
 		ok     bool
 	}
 
-	weightsResult struct {
+	weightsResult = struct {
 		weights reusability.Weights
 		code    int
 		ok      bool
 	}
 
-	buildArgs struct {
+	buildArgs = struct {
 		flagSet *flag.FlagSet
 		vals    *flagValues
 		logger  *slog.Logger

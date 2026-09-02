@@ -18,7 +18,7 @@ func (f *ProjectFacts) String() string {
 }
 
 // String summarizes the extract for debugging.
-func (t *TypeExtract) String() string {
+func typeExtractString(t *TypeExtract) string {
 	return fmt.Sprintf(
 		"type %q (kind %d, exported %v) at %v: %d fields, %d methods, %d refs, %d/%d documented",
 		t.Name,
@@ -34,7 +34,7 @@ func (t *TypeExtract) String() string {
 }
 
 // String summarizes the type facts for debugging.
-func (t *TypeFacts) String() string {
+func typeFactsString(t *TypeFacts) string {
 	return fmt.Sprintf(
 		"type %d %q (pkg %d, kind %d, exported %v) at %v: %d fields, %d methods, %d refs, %d/%d docs",
 		t.ID,

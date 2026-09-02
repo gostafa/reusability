@@ -38,9 +38,7 @@ func New(settings *Settings) (*analysis.Analyzer, error) {
 		Name:       Name,
 		Doc:        Doc,
 		ResultType: reflect.TypeFor[*runResult](),
-		Run: func(pass *analysis.Pass) (any, error) {
-			return active.run(pass)
-		},
+		Run:        func(pass *analysis.Pass) (any, error) { return runRunner(active, pass) },
 	}, nil
 }
 
@@ -229,19 +227,6 @@ func settingsWithDefaults(settings *Settings) Settings {
 }
 
 // Analyze delegates to the adapted function.
-func (fn analyzeFunc) Analyze(
-	ctx context.Context,
-	cfg *reusability.Config,
-) (reusability.Report, error) {
-	// Forward to the wrapped analyze function and wrap any failure.
-	report, err := fn(ctx, cfg)
-	if err != nil {
-		return reusability.Report{}, fmt.Errorf("Analyze: %w", err)
-	}
-
-	return report, nil
-}
-
 // computeViolations performs the fallible analysis work before the runner
 // caches its result for subsequent package passes.
 func computeViolations(
@@ -256,7 +241,7 @@ func computeViolations(
 
 	cfg := settingsToConfig(settings)
 
-	report, err := analyzer.Analyze(context.Background(), &cfg)
+	report, err := analyzer(context.Background(), &cfg)
 	if err != nil {
 		return nil, fmt.Errorf("reusability analyze: %w", err)
 	}
@@ -319,7 +304,7 @@ func groupByPackage(violations []policydomain.Violation) map[string][]policydoma
 }
 
 func newRunner(settings *Settings) *runner {
-	return &runner{settings: *settings, analyzer: analyzeFunc(reusability.Analyze)}
+	return &runner{settings: *settings, analyzer: reusability.Analyze}
 }
 
 // packagePos returns a position for package-scoped diagnostics: the package
@@ -386,18 +371,18 @@ func reportViolations(pass *analysis.Pass, violations []policydomain.Violation) 
 	}
 }
 
-func (runner *runner) load() {
-	runner.byPkg, runner.err = computeViolations(&runner.settings, runner.analyzer)
+func loadRunner(state *runner) {
+	state.byPkg, state.err = computeViolations(&state.settings, state.analyzer)
 }
 
-func (runner *runner) run(pass *analysis.Pass) (*runResult, error) {
-	runner.once.Do(runner.load)
+func runRunner(state *runner, pass *analysis.Pass) (*runResult, error) {
+	state.once.Do(func() { loadRunner(state) })
 
-	if runner.err != nil {
-		return nil, fmt.Errorf("run: %w", runner.err)
+	if state.err != nil {
+		return nil, fmt.Errorf("run: %w", state.err)
 	}
 
-	reportViolations(pass, runner.byPkg[pass.Pkg.Path()])
+	reportViolations(pass, state.byPkg[pass.Pkg.Path()])
 
 	return &runResult{}, nil
 }

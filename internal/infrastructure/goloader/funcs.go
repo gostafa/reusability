@@ -32,11 +32,20 @@ var (
 
 // Load loads the requested patterns once, deduplicates test variants, and
 // extracts per-package facts with bounded package-level concurrency.
-func (*Loader) Load(
+func (loader *Loader) Load(
 	ctx context.Context,
 	opts *outbound.FactOptions,
 ) (string, []domain.PackageExtract, error) {
-	// Load.
+	return loader.extract(ctx, opts)
+}
+
+// New returns a compiler-backed fact source.
+func New() *Loader { return &Loader{extract: extractFacts} }
+
+func extractFacts(
+	ctx context.Context,
+	opts *outbound.FactOptions,
+) (string, []domain.PackageExtract, error) {
 	modulePath, extracts, err := load(ctx, opts, defaultLoaderDeps())
 	if err != nil {
 		return emptyString, nil, fmt.Errorf("goloader load: %w", err)
@@ -44,9 +53,6 @@ func (*Loader) Load(
 
 	return modulePath, extracts, nil
 }
-
-// New returns a compiler-backed fact source.
-func New() *Loader { return &Loader{} }
 
 func defaultLoaderDeps() *loaderDeps {
 	return &loaderDeps{

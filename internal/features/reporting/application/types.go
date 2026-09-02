@@ -11,7 +11,7 @@ import (
 
 type (
 	// WriteRequest holds the inputs for Write.
-	WriteRequest struct {
+	WriteRequest = struct {
 		// Sink is the destination that receives the rendered report bytes.
 		Sink outbound.Sink
 		// Format selects the report rendering format (text, json, csv, or web).
@@ -22,7 +22,7 @@ type (
 		Options domain.TextOptions
 	}
 
-	docsPayload struct {
+	docsPayload = struct {
 		// Tool identifies the producing tool.
 		Tool jsonTool `json:"tool"`
 		// Docs are the guide entries in render order.

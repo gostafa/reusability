@@ -60,7 +60,7 @@ type (
 
 	scoreBias int
 
-	metricQuality struct {
+	metricQuality = struct {
 		bias    scoreBias
 		bounded bool
 	}
@@ -77,13 +77,13 @@ type (
 		children []*treeNode
 	}
 
-	treeSummary struct {
+	treeSummary = struct {
 		typeAgg    map[string]*columnStats
 		pkgsTotal  int
 		typesTotal int
 	}
 
-	textTable struct {
+	textTable = struct {
 		typeCols []string
 		rows     [][]tableCell
 	}
@@ -106,7 +106,7 @@ type (
 		color bool
 	}
 
-	rowWriteArgs struct {
+	rowWriteArgs = struct {
 		builder *strings.Builder
 		row     []tableCell
 		widths  []int
@@ -120,13 +120,13 @@ type (
 		color   bool
 	}
 
-	notesWriter struct {
+	notesWriter = struct {
 		builder *strings.Builder
 		color   bool
 		wrote   bool
 	}
 
-	noteCollectState struct {
+	noteCollectState = struct {
 		index   map[string]int
 		entries []noteEntry
 		count   int

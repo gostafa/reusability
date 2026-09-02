@@ -21,7 +21,7 @@ type (
 	Weights = metrics.ReusabilityWeights
 
 	// Config configures one Analyze invocation.
-	Config struct {
+	Config = struct {
 		// Directory is the module root used for package loading.
 		Directory string
 		// DependencyScope selects which imports count toward coupling

@@ -11,7 +11,7 @@ import (
 type (
 	declKind int
 
-	pkgDecl struct {
+	pkgDecl = struct {
 		decl ast.Decl
 		kind declKind
 	}
@@ -37,14 +37,14 @@ type (
 		pkgImports []ast.Spec
 	}
 
-	mergeTestsInput struct {
+	mergeTestsInput = struct {
 		fset      *token.FileSet
 		pkg       packageInfo
 		license   string
 		testFiles []string
 	}
 
-	mergeConstInput struct {
+	mergeConstInput = struct {
 		genDecl    *ast.GenDecl
 		seen       map[string]string
 		onConflict constConflictAction
@@ -63,7 +63,7 @@ type (
 		otherDecls  []ast.Decl
 	}
 
-	prodScanResult struct {
+	prodScanResult = struct {
 		fset       *token.FileSet
 		packageDoc string
 		license    string
@@ -103,7 +103,7 @@ type (
 
 	testFileMode int
 
-	constConflictInput struct {
+	constConflictInput = struct {
 		valueSpec *ast.ValueSpec
 		input     mergeConstInput
 		name      string
@@ -142,7 +142,7 @@ type (
 		packageDoc string
 	}
 
-	kindWriteInput struct {
+	kindWriteInput = struct {
 		scan  *prodScanResult
 		name  string
 		decls []ast.Decl
@@ -153,7 +153,7 @@ type (
 		imports    []*ast.ImportSpec
 	}
 
-	prodAccumulateState struct {
+	prodAccumulateState = struct {
 		doc   string
 		decls []pkgDecl
 	}

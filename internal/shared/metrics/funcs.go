@@ -11,13 +11,13 @@ import (
 )
 
 type (
-	metricSpec struct {
+	metricSpec = struct {
 		name       string
 		scope      MetricScope
 		definition string
 	}
 
-	weightedComponent struct {
+	weightedComponent = struct {
 		component ReusabilityComponent
 		weight    float64
 	}

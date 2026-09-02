@@ -18,12 +18,24 @@ import (
 
 // NewPipeline returns a pipeline backed by the given fact collector.
 func NewPipeline(facts typefacts.Collector) *Pipeline {
-	return &Pipeline{facts: facts}
+	return &Pipeline{
+		analyze: func(ctx context.Context, opts *inbound.Options) (inbound.Result, error) {
+			return runPipeline(ctx, facts, opts)
+		},
+	}
 }
 
 // Analyze runs the full pipeline for one request.
 func (pipeline *Pipeline) Analyze(
 	ctx context.Context,
+	opts *inbound.Options,
+) (inbound.Result, error) {
+	return pipeline.analyze(ctx, opts)
+}
+
+func runPipeline(
+	ctx context.Context,
+	facts typefacts.Collector,
 	opts *inbound.Options,
 ) (inbound.Result, error) {
 	compute := nameSet(metrics.Closure([]string{metrics.MetricReusability}))
@@ -33,12 +45,12 @@ func (pipeline *Pipeline) Analyze(
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAnalyze, err)
 	}
 
-	facts, err := loadFacts(ctx, pipeline.facts, opts)
+	projectFacts, err := loadFacts(ctx, facts, opts)
 	if err != nil {
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAnalyze, err)
 	}
 
-	result, err := assembleResult(ctx, facts, calculator, opts)
+	result, err := assembleResult(ctx, projectFacts, calculator, opts)
 	if err != nil {
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAssemble, err)
 	}

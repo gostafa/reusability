@@ -59,7 +59,7 @@ func TestRunnerRunReportsPackageAndTypeViolations(t *testing.T) {
 		Report: func(d analysis.Diagnostic) { diagnostics = append(diagnostics, d) },
 	}
 
-	if _, err := r.run(pass); err != nil {
+	if _, err := runRunner(r, pass); err != nil {
 		t.Fatal(err)
 	}
 	if len(diagnostics) != 1 {
@@ -72,7 +72,7 @@ func TestRunnerRunReportsPackageAndTypeViolations(t *testing.T) {
 	sentinel := errors.New("cached load error")
 	failing := &runner{err: sentinel}
 	failing.once.Do(func() {})
-	if _, err := failing.run(pass); !errors.Is(err, sentinel) {
+	if _, err := runRunner(failing, pass); !errors.Is(err, sentinel) {
 		t.Fatalf("run error = %v, want sentinel", err)
 	}
 }
@@ -82,7 +82,7 @@ func TestRunnerLoadErrors(t *testing.T) {
 	settings := Settings{Rules: []RuleSettings{{Pattern: "**", Min: &min}}}
 	s := settingsWithDefaults(&settings)
 	r := newRunner(&s)
-	r.load()
+	loadRunner(r)
 	if r.err == nil || !strings.Contains(r.err.Error(), "reusability policy") {
 		t.Fatalf("policy load error = %v", r.err)
 	}
@@ -93,7 +93,7 @@ func TestRunnerLoadErrors(t *testing.T) {
 	}
 	s = settingsWithDefaults(&settings)
 	r = newRunner(&s)
-	r.load()
+	loadRunner(r)
 	if r.err == nil || !strings.Contains(r.err.Error(), "reusability analyze") {
 		t.Fatalf("analysis load error = %v", r.err)
 	}

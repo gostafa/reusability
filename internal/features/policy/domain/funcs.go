@@ -247,6 +247,7 @@ func moreSpecific(candidate, current string) bool {
 func patternSpecificity(pattern string) (literal, wildcards, segments int) {
 	for _, segment := range splitPattern(pattern) {
 		segments++
+
 		if segment == star || segment == doubleStar {
 			wildcards++
 

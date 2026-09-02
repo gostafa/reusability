@@ -32,7 +32,7 @@ type (
 		pi, si int
 	}
 
-	typeGate struct {
+	typeGate = struct {
 		typ       *reusability.TypeReport
 		pkgPath   string
 		pattern   string

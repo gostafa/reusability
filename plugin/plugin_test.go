@@ -77,9 +77,6 @@ func TestNewNilSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if p.settings.Patterns != nil || p.settings.Tests || p.settings.Generated || p.settings.ReusabilityWeights != nil {
-		t.Fatalf("nil settings = %+v", p.settings)
-	}
 	if _, err := p.BuildAnalyzers(); err != nil {
 		t.Fatal(err)
 	}

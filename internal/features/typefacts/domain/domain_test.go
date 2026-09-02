@@ -31,18 +31,13 @@ func TestStringers(t *testing.T) {
 	}
 
 	tf := &TypeFacts{Name: "W", Kind: KindInterface}
-	if s := tf.String(); !strings.Contains(s, `"W"`) {
-		t.Errorf("TypeFacts.String = %q", s)
-	}
-
-	mf := &MethodFacts{Name: "Do"}
-	if s := mf.String(); !strings.Contains(s, `"Do"`) {
-		t.Errorf("MethodFacts.String = %q", s)
+	if s := typeFactsString(tf); !strings.Contains(s, `"W"`) {
+		t.Errorf("typeFactsString = %q", s)
 	}
 
 	te := &TypeExtract{Name: "E"}
-	if s := te.String(); !strings.Contains(s, `"E"`) {
-		t.Errorf("TypeExtract.String = %q", s)
+	if s := typeExtractString(te); !strings.Contains(s, `"E"`) {
+		t.Errorf("typeExtractString = %q", s)
 	}
 }
 

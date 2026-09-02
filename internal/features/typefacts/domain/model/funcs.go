@@ -10,7 +10,7 @@ import (
 )
 
 // String summarizes the method facts for debugging.
-func (method *MethodFacts) String() string {
+func methodFactsString(method *MethodFacts) string {
 	return fmt.Sprintf(
 		"method %q (exported %v) at %v: uses %d fields, branches %+v, calls %v",
 		method.Name,

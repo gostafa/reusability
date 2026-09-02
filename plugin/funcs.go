@@ -32,7 +32,18 @@ func New(raw any) (*Plugin, error) {
 		return nil, fmt.Errorf("New: %w", err)
 	}
 
-	return &Plugin{settings: settings}, nil
+	return &Plugin{build: analyzerBuilder(settings)}, nil
+}
+
+func analyzerBuilder(settings analyzer.Settings) func() ([]*analysis.Analyzer, error) {
+	return func() ([]*analysis.Analyzer, error) {
+		analyzerInstance, err := analyzer.New(&settings)
+		if err != nil {
+			return nil, fmt.Errorf("BuildAnalyzers: %w", err)
+		}
+
+		return []*analysis.Analyzer{analyzerInstance}, nil
+	}
 }
 
 func decodePluginSettings(raw any) (analyzer.Settings, error) {
@@ -57,12 +68,7 @@ func decodePluginSettings(raw any) (analyzer.Settings, error) {
 
 // BuildAnalyzers returns the reusability go/analysis Analyzer.
 func (plugin *Plugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
-	analyzerInstance, err := analyzer.New(&plugin.settings)
-	if err != nil {
-		return nil, fmt.Errorf("BuildAnalyzers: %w", err)
-	}
-
-	return []*analysis.Analyzer{analyzerInstance}, nil
+	return plugin.build()
 }
 
 // GetLoadMode requests type information so diagnostics can locate type

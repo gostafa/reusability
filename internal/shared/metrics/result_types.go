@@ -41,7 +41,7 @@ type (
 	}
 
 	// ReusabilityInput bundles the four components and their weights.
-	ReusabilityInput struct {
+	ReusabilityInput = struct {
 		// Cohesion is the cohesion component derived from LCOM.
 		Cohesion ReusabilityComponent
 		// Coupling is the coupling component derived from CBO.

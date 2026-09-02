@@ -611,7 +611,7 @@ func attachPackage(root *treeNode, pkg *reusability.PackageReport, module string
 	node := root
 
 	for seg := range strings.SplitSeq(rel, "/") {
-		node = node.child(seg)
+		node = appendTreeChild(&node.children, seg)
 	}
 
 	node.pkg = pkg
@@ -940,32 +940,40 @@ func thresholdColor(bias scoreBias, score float64) string {
 	}
 }
 
-func (node *treeNode) child(name string) *treeNode {
-	for i := range node.children {
-		if node.children[i].name == name {
-			return node.children[i]
+func appendTreeChild(children *[]*treeNode, name string) *treeNode {
+	for i := range *children {
+		if (*children)[i].name == name {
+			return (*children)[i]
 		}
 	}
 
 	child := &treeNode{name: name}
 
-	node.children = append(node.children, child)
+	*children = append(*children, child)
 
 	return child
 }
 
 func (node *treeNode) compress() {
 	for node.pkg == nil && len(node.children) == countOne {
-		child := node.children[indexZero]
-
-		node.name = node.name + "/" + child.name
-		node.pkg = child.pkg
-		node.children = child.children
+		node.absorbOnlyChild()
 	}
 
-	for i := range node.children {
-		node.children[i].compress()
+	compressTreeChildren(node.children)
+}
+
+func compressTreeChildren(children []*treeNode) {
+	for i := range children {
+		children[i].compress()
 	}
+}
+
+func (node *treeNode) absorbOnlyChild() {
+	child := node.children[indexZero]
+
+	node.name = node.name + "/" + child.name
+	node.pkg = child.pkg
+	node.children = child.children
 }
 
 func valueColor(name string, value float64, stat *columnStats) string {
@@ -1000,7 +1008,7 @@ func writeNotes(builder *strings.Builder, report *reusability.Report, color bool
 	writer := &notesWriter{builder: builder, color: color}
 
 	for i := range report.Packages {
-		err := writer.writePackage(&report.Packages[i])
+		err := writeNotesPackage(writer, &report.Packages[i])
 		if err != nil {
 			return fmt.Errorf("write package notes: %w", err)
 		}
@@ -1009,14 +1017,14 @@ func writeNotes(builder *strings.Builder, report *reusability.Report, color bool
 	return nil
 }
 
-func (writer *notesWriter) writePackage(pkg *reusability.PackageReport) error {
+func writeNotesPackage(writer *notesWriter, pkg *reusability.PackageReport) error {
 	notes := packageNotes(pkg)
 
 	if len(notes) == indexZero {
 		return nil
 	}
 
-	err := writer.ensureHeader()
+	err := ensureNotesHeader(writer)
 	if err != nil {
 		return fmt.Errorf("write notes header: %w", err)
 	}
@@ -1031,7 +1039,7 @@ func (writer *notesWriter) writePackage(pkg *reusability.PackageReport) error {
 	return nil
 }
 
-func (writer *notesWriter) ensureHeader() error {
+func ensureNotesHeader(writer *notesWriter) error {
 	if writer.wrote {
 		return nil
 	}

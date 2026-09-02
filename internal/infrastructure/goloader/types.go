@@ -19,14 +19,14 @@ type (
 	generatedInclusion bool
 	packageErrorPolicy bool
 
-	loaderDeps struct {
+	loaderDeps = struct {
 		packagesLoad      func(*packages.Config, ...string) ([]*packages.Package, error)
 		runExtractWorkers func(context.Context, workerpool.RunConfig) error
 		getwd             func() (string, error)
 		absPath           func(string) (string, error)
 	}
 
-	extractorOptions struct {
+	extractorOptions = struct {
 		analyzed   map[string]bool
 		modulePath string
 		baseDir    string
@@ -55,39 +55,39 @@ type (
 		visited  map[types.Type]bool
 	}
 
-	syntaxIndex struct {
+	syntaxIndex = struct {
 		generated map[string]bool
 		funcDecls map[*types.Func]*ast.FuncDecl
 		typeDocs  map[types.Object]bool
 		fieldDocs []docRange
 	}
 
-	extractJob struct {
+	extractJob = struct {
 		opts       *outbound.FactOptions
 		modulePath string
 		pkgs       []*packages.Package
 	}
 
-	selectLoadedRequest struct {
+	selectLoadedRequest = struct {
 		loaded   []*packages.Package
 		opts     *outbound.FactOptions
 		patterns []string
 	}
 
-	filterPackagesRequest struct {
+	filterPackagesRequest = struct {
 		byPath map[string]*packages.Package
 		order  []string
 		policy packageErrorPolicy
 	}
 
-	structFieldsResult struct {
+	structFieldsResult = struct {
 		fields     []domain.FieldFacts
 		fieldIndex map[*types.Var]int
 		positions  []token.Pos
 	}
 
 	// extractCtx is the per-package extraction collaborator (CBO≤1 via *syntaxIndex).
-	extractCtx struct {
+	extractCtx = struct {
 		pkg              *packages.Package
 		idx              *syntaxIndex
 		analyzed         map[string]bool
@@ -95,14 +95,14 @@ type (
 		includeGenerated bool
 	}
 
-	skipPosRequest struct {
+	skipPosRequest = struct {
 		fset      *token.FileSet
 		generated map[string]bool
 		policy    generatedInclusion
 		pos       token.Pos
 	}
 
-	selectionRequest struct {
+	selectionRequest = struct {
 		info        *types.Info
 		n           *ast.SelectorExpr
 		fieldIndex  map[*types.Var]int
@@ -113,7 +113,7 @@ type (
 		excludeSelf bool
 	}
 
-	walkBodyRequest struct {
+	walkBodyRequest = struct {
 		info        *types.Info
 		decl        *ast.FuncDecl
 		self        *types.Func
@@ -136,7 +136,7 @@ type (
 		t        *types.Named
 	}
 
-	typeSpecIndex struct {
+	typeSpecIndex = struct {
 		info *types.Info
 		idx  *syntaxIndex
 		decl *ast.GenDecl
@@ -147,7 +147,7 @@ type (
 		errs []string
 	}
 
-	packageConsider struct {
+	packageConsider = struct {
 		path   string
 		policy packageErrorPolicy
 	}
@@ -159,5 +159,7 @@ type (
 	}
 
 	// Loader is a compiler-backed outbound.FactSource.
-	Loader struct{}
+	Loader struct {
+		extract func(context.Context, *outbound.FactOptions) (string, []domain.PackageExtract, error)
+	}
 )

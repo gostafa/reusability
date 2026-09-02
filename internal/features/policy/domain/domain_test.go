@@ -114,10 +114,14 @@ func TestMoreSpecific(t *testing.T) {
 			wantRule: "**/internal/**", wantMin: 0.5,
 		},
 		{
-			name:     "fewer wildcards break equal literal count",
-			path:     "example.com/m/store",
-			rules:    []Rule{{Pattern: "example.com/*/store", Min: 0.6}, {Pattern: "example.com/m/store", Min: 0.5}},
-			wantRule: "example.com/m/store", wantMin: 0.5,
+			name: "fewer wildcards break equal literal count",
+			path: "example.com/m/store",
+			rules: []Rule{
+				{Pattern: "example.com/*/store", Min: 0.6},
+				{Pattern: "example.com/m/store", Min: 0.5},
+			},
+			wantRule: "example.com/m/store",
+			wantMin:  0.5,
 		},
 		{
 			name:     "fewer wildcards beat longer patterns",
@@ -126,10 +130,14 @@ func TestMoreSpecific(t *testing.T) {
 			wantRule: "**/store", wantMin: 0.6,
 		},
 		{
-			name:     "later rule wins exact specificity tie",
-			path:     "example.com/m/store",
-			rules:    []Rule{{Pattern: "example.com/*/store", Min: 0.6}, {Pattern: "example.com/*/store", Min: 0.5}},
-			wantRule: "example.com/*/store", wantMin: 0.5,
+			name: "later rule wins exact specificity tie",
+			path: "example.com/m/store",
+			rules: []Rule{
+				{Pattern: "example.com/*/store", Min: 0.6},
+				{Pattern: "example.com/*/store", Min: 0.5},
+			},
+			wantRule: "example.com/*/store",
+			wantMin:  0.5,
 		},
 	}
 
@@ -137,7 +145,13 @@ func TestMoreSpecific(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			gotMin, gotRule := matchingRule(tc.path, tc.rules)
 			if gotRule != tc.wantRule || gotMin != tc.wantMin {
-				t.Fatalf("matchingRule() = (%v, %q), want (%v, %q)", gotMin, gotRule, tc.wantMin, tc.wantRule)
+				t.Fatalf(
+					"matchingRule() = (%v, %q), want (%v, %q)",
+					gotMin,
+					gotRule,
+					tc.wantMin,
+					tc.wantRule,
+				)
 			}
 		})
 	}

@@ -34,7 +34,7 @@ type (
 		Total int
 	}
 
-	scopeCheck struct {
+	scopeCheck = struct {
 		analyzed   map[string]int
 		path       string
 		modulePath string

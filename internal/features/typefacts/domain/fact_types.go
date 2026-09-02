@@ -24,7 +24,7 @@ type (
 	}
 
 	// TypeFacts is one named type after ID assignment.
-	TypeFacts struct {
+	TypeFacts = struct {
 		Name                      string
 		Fields                    []FieldFacts
 		Methods                   []MethodFacts

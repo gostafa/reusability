@@ -3,16 +3,14 @@
 
 package plugin
 
-import (
-	"github.com/gostafa/reusability/analyzer"
-)
+import "golang.org/x/tools/go/analysis"
 
 type (
 	// Plugin is the golangci-lint module plugin for reusability.
 	Plugin struct {
 		loadMode
 
-		settings analyzer.Settings
+		build func() ([]*analysis.Analyzer, error)
 	}
 
 	loadMode struct{}

@@ -4,12 +4,14 @@
 package application
 
 import (
-	typefacts "github.com/gostafa/reusability/internal/features/typefacts/application"
+	"context"
+
+	"github.com/gostafa/reusability/internal/features/projectanalysis/ports/inbound"
 )
 
 type (
 	// Pipeline orchestrates fact collection and metric computation.
 	Pipeline struct {
-		facts typefacts.Collector
+		analyze func(context.Context, *inbound.Options) (inbound.Result, error)
 	}
 )

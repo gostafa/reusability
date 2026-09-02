@@ -20,7 +20,7 @@ type (
 	}
 
 	// Report is the deterministic analysis output.
-	Report struct {
+	Report = struct {
 		// SchemaVersion identifies the report schema; it equals the
 		// SchemaVersion constant for reports this build produces.
 		SchemaVersion string
