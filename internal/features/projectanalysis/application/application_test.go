@@ -40,7 +40,9 @@ func (coverageSource) Load(
 func TestAssembleResultWorkerError(t *testing.T) {
 	sentinel := errors.New("workers failed")
 	pipeline := NewPipeline(typefacts.NewService(coverageSource{}))
-	pipeline.runWorkers = func(context.Context, workerpool.RunConfig) error {
+	orig := runWorkers
+	t.Cleanup(func() { runWorkers = orig })
+	runWorkers = func(context.Context, workerpool.RunConfig) error {
 		return sentinel
 	}
 

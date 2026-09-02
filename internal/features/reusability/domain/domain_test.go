@@ -7,8 +7,18 @@ import (
 	"testing"
 
 	typefacts "github.com/gostafa/reusability/internal/features/typefacts/domain"
+	"github.com/gostafa/reusability/internal/shared/bitset"
 	"github.com/gostafa/reusability/internal/shared/metrics"
 )
+
+func fieldSet(size int, idx ...int) bitset.FieldSet {
+	s := bitset.NewFieldSet(size)
+	for _, i := range idx {
+		s.Set(i)
+	}
+
+	return s
+}
 
 // White-box: Compute derives CBO from the referenced-types fact and folds
 // the four components into the index.
@@ -16,15 +26,18 @@ func TestComputeDerivesCBOAndIndex(t *testing.T) {
 	t.Parallel()
 
 	tf := &typefacts.TypeFacts{
-		ReferencedTypeIDs:         []int{2, 5, 9},
+		ReferencedTypeIDs: []int{2, 5, 9},
+		Fields:            []typefacts.FieldFacts{{Name: "a"}, {Name: "b"}, {Name: "c"}},
+		Methods: []typefacts.MethodFacts{
+			{Name: "M1", FieldsUsed: fieldSet(3, 0), Branches: typefacts.BranchStats{Ifs: 1}},
+			{Name: "M2", FieldsUsed: fieldSet(3, 1), Branches: typefacts.BranchStats{Ifs: 1}},
+			{Name: "M3", FieldsUsed: fieldSet(3, 0, 1), Branches: typefacts.BranchStats{}},
+		},
 		ExportedMembers:           4,
 		DocumentedExportedMembers: 3,
 	}
-	amc := metrics.AMC(6, 3)
-	lcom := metrics.LCOM(2, 3, 3)
-	weights := metrics.DefaultReusabilityWeights()
 
-	got := Compute(&ComputeInput{Type: tf, AMC: amc, LCOM: lcom, Weights: weights})
+	got := Compute(tf, metrics.DefaultReusabilityWeights(), "direct")
 
 	if got.CBO != metrics.CBO(len(tf.ReferencedTypeIDs)) {
 		t.Errorf("CBO = %+v, want %+v", got.CBO, metrics.CBO(3))
@@ -35,18 +48,14 @@ func TestComputeDerivesCBOAndIndex(t *testing.T) {
 	}
 }
 
-// White-box: when the upstream cohesion/testability inputs are not
-// applicable, their components are dropped and the index renormalizes.
+// White-box: when the type has no methods/fields, cohesion and testability
+// drop and the index renormalizes.
 func TestComputeDropsNotApplicableComponents(t *testing.T) {
 	t.Parallel()
 
 	tf := &typefacts.TypeFacts{ExportedMembers: 2, DocumentedExportedMembers: 1}
-	amc := metrics.AMC(0, 0)
-	lcom := metrics.LCOM(0, 0, 1)
 
-	got := Compute(&ComputeInput{
-		Type: tf, AMC: amc, LCOM: lcom, Weights: metrics.DefaultReusabilityWeights(),
-	})
+	got := Compute(tf, metrics.DefaultReusabilityWeights(), "direct")
 
 	if got.CBO != metrics.CBO(0) {
 		t.Errorf("CBO = %+v, want %+v", got.CBO, metrics.CBO(0))
@@ -63,20 +72,30 @@ func TestComputeIndexRewardsQuality(t *testing.T) {
 	t.Parallel()
 
 	weights := metrics.DefaultReusabilityWeights()
-	amc := metrics.AMC(2, 2)
-	lcom := metrics.LCOM(4, 2, 2)
+	fields := []typefacts.FieldFacts{{Name: "a"}, {Name: "b"}}
+	methods := []typefacts.MethodFacts{
+		{Name: "M1", FieldsUsed: fieldSet(2, 0, 1), Branches: typefacts.BranchStats{Ifs: 1}},
+		{Name: "M2", FieldsUsed: fieldSet(2, 0, 1), Branches: typefacts.BranchStats{Ifs: 1}},
+	}
 
-	good := Compute(&ComputeInput{
-		Type: &typefacts.TypeFacts{ExportedMembers: 4, DocumentedExportedMembers: 4},
-		AMC:  amc, LCOM: lcom, Weights: weights,
-	})
-	poor := Compute(&ComputeInput{
-		Type: &typefacts.TypeFacts{
+	good := Compute(
+		&typefacts.TypeFacts{
+			Fields: fields, Methods: methods,
+			ExportedMembers: 4, DocumentedExportedMembers: 4,
+		},
+		weights,
+		"direct",
+	)
+	poor := Compute(
+		&typefacts.TypeFacts{
 			ReferencedTypeIDs: []int{1, 2, 3, 4, 5},
+			Fields:            fields,
+			Methods:           methods,
 			ExportedMembers:   4, DocumentedExportedMembers: 0,
 		},
-		AMC: amc, LCOM: lcom, Weights: weights,
-	})
+		weights,
+		"direct",
+	)
 
 	if !good.Reusability.Applicable || !poor.Reusability.Applicable {
 		t.Fatal("both indices should be applicable")

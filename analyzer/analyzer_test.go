@@ -69,7 +69,7 @@ func TestRunnerRunReportsPackageAndTypeViolations(t *testing.T) {
 func TestRunnerLoadErrors(t *testing.T) {
 	min := 2.0
 	settings := Settings{Rules: []RuleSettings{{Pattern: "**", Min: &min}}}
-	s := (&settings).withDefaults()
+	s := settingsWithDefaults(&settings)
 	r := newRunner(&s)
 	r.load()
 	if r.err == nil || !strings.Contains(r.err.Error(), "reusability policy") {
@@ -80,7 +80,7 @@ func TestRunnerLoadErrors(t *testing.T) {
 		Directory: filepath.Join(t.TempDir(), "missing"),
 		Patterns:  []string{defaultPackagePattern},
 	}
-	s = (&settings).withDefaults()
+	s = settingsWithDefaults(&settings)
 	r = newRunner(&s)
 	r.load()
 	if r.err == nil || !strings.Contains(r.err.Error(), "reusability analyze") {
@@ -100,7 +100,7 @@ func TestInlinePolicyDefaultsAndIgnoresModularityFile(t *testing.T) {
 	}
 
 	defaultsSettings := Settings{Directory: dir}
-	defaults, err := (&defaultsSettings).rules()
+	defaults, err := settingsRules(&defaultsSettings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestInlinePolicyDefaultsAndIgnoresModularityFile(t *testing.T) {
 		{Pattern: "**/internal/**", Min: ptr(0.8)},
 		{Pattern: "**", Min: &min},
 	}}
-	inline, err := (&inlineSettings).rules()
+	inline, err := settingsRules(&inlineSettings)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,9 +7,6 @@ import (
 	"context"
 	"fmt"
 
-	cohesion "github.com/gostafa/reusability/internal/features/cohesion/application"
-	cohesdomain "github.com/gostafa/reusability/internal/features/cohesion/domain"
-	complexity "github.com/gostafa/reusability/internal/features/complexity/application"
 	"github.com/gostafa/reusability/internal/features/projectanalysis/ports/inbound"
 	reusability "github.com/gostafa/reusability/internal/features/reusability/application"
 	typefacts "github.com/gostafa/reusability/internal/features/typefacts/application"
@@ -21,7 +18,7 @@ import (
 
 // NewPipeline returns a pipeline backed by the given fact collector.
 func NewPipeline(facts typefacts.Collector) *Pipeline {
-	return &Pipeline{facts: facts, runWorkers: workerpool.Run}
+	return &Pipeline{facts: facts}
 }
 
 // Analyze runs the full pipeline for one request.
@@ -29,7 +26,6 @@ func (pipeline *Pipeline) Analyze(
 	ctx context.Context,
 	opts *inbound.Options,
 ) (inbound.Result, error) {
-	// Build compute set, calculator, then collect facts and assemble results.
 	compute := nameSet(metrics.Closure([]string{metrics.MetricReusability}))
 
 	calculator, err := newReusabilityCalculator(compute, &opts.Weights)
@@ -37,27 +33,12 @@ func (pipeline *Pipeline) Analyze(
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAnalyze, err)
 	}
 
-	result, err := pipeline.collectAndAssemble(ctx, &analysisRun{
-		opts: opts, compute: compute, calculator: calculator,
-	})
+	facts, err := loadFacts(ctx, pipeline.facts, opts)
 	if err != nil {
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAnalyze, err)
 	}
 
-	return result, nil
-}
-
-func (pipeline *Pipeline) collectAndAssemble(
-	ctx context.Context,
-	run *analysisRun,
-) (inbound.Result, error) {
-	// Collect facts then assemble package/type metric results.
-	facts, err := pipeline.loadFacts(ctx, run.opts)
-	if err != nil {
-		return inbound.Result{}, fmt.Errorf(errFmtOp, opAnalyze, err)
-	}
-
-	result, err := pipeline.assembleFromFacts(ctx, run, facts)
+	result, err := assembleResult(ctx, facts, calculator, opts)
 	if err != nil {
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAssemble, err)
 	}
@@ -65,34 +46,14 @@ func (pipeline *Pipeline) collectAndAssemble(
 	return result, nil
 }
 
-func (pipeline *Pipeline) assembleFromFacts(
+func loadFacts(
 	ctx context.Context,
-	run *analysisRun,
-	facts *tfdomain.ProjectFacts,
-) (inbound.Result, error) {
-	// Assemble inbound results from collected project facts.
-	result, err := assembleResult(ctx, &assembleJob{
-		facts:                 facts,
-		reusabilityCalculator: run.calculator,
-		compute:               run.compute,
-		opts:                  run.opts,
-		runWorkers:            pipeline.runWorkers,
-	})
-	if err != nil {
-		return inbound.Result{}, fmt.Errorf(errFmtOp, opAssemble, err)
-	}
-
-	return result, nil
-}
-
-func (pipeline *Pipeline) loadFacts(
-	ctx context.Context,
+	collector typefacts.Collector,
 	opts *inbound.Options,
 ) (*tfdomain.ProjectFacts, error) {
-	// Map inbound options onto fact-source options and collect.
 	fo := collectOptions(opts)
 
-	facts, err := pipeline.facts.Collect(ctx, &fo)
+	facts, err := collector.Collect(ctx, &fo)
 	if err != nil {
 		return nil, fmt.Errorf(errFmtOp, opAnalyze, err)
 	}
@@ -100,56 +61,54 @@ func (pipeline *Pipeline) loadFacts(
 	return &facts, nil
 }
 
-func analyzePackage(job *packageJob) inbound.PackageResult {
-	pkg := &job.facts.Packages[job.pkgID]
+func analyzePackage(
+	facts *tfdomain.ProjectFacts,
+	pkgID int,
+	calculator *reusability.Service,
+	opts *inbound.Options,
+) inbound.PackageResult {
+	pkg := &facts.Packages[pkgID]
 	result := inbound.PackageResult{Path: pkg.Path}
-	needs := packageNeeds(job.compute)
 
 	result.Types = make([]inbound.TypeResult, zero, len(pkg.TypeIDs))
 
 	for index := range pkg.TypeIDs {
-		result.Types = append(result.Types, analyzeType(&typeJob{
-			typeFacts:             &job.facts.Types[pkg.TypeIDs[index]],
-			reusabilityCalculator: job.reusabilityCalculator,
-			needs:                 needs,
-			opts:                  job.opts,
-		}))
+		result.Types = append(result.Types, analyzeType(
+			&facts.Types[pkg.TypeIDs[index]], calculator, opts,
+		))
 	}
 
 	return result
 }
 
-func analyzeType(job *typeJob) inbound.TypeResult {
-	var complexityResult complexity.Result
-
-	if job.needs&needComplexity != zero {
-		complexityResult = complexity.ComputeForType(job.typeFacts)
-	}
-
-	var cohesionResult cohesion.Result
-
-	if job.needs&needCohesion != zero {
-		cohesionResult = cohesion.ComputeForType(job.typeFacts, fieldUsageMode(job.opts))
-	}
-
+func analyzeType(
+	typeFacts *tfdomain.TypeFacts,
+	calculator *reusability.Service,
+	opts *inbound.Options,
+) inbound.TypeResult {
 	return inbound.TypeResult{
-		Name:        job.typeFacts.Name,
-		Reusability: typeReusability(job, &complexityResult.AMC, &cohesionResult.LCOM),
+		Name:        typeFacts.Name,
+		Reusability: typeReusability(calculator, typeFacts, fieldUsageMode(opts)),
 	}
 }
 
-func assembleResult(ctx context.Context, job *assembleJob) (inbound.Result, error) {
+func assembleResult(
+	ctx context.Context,
+	facts *tfdomain.ProjectFacts,
+	calculator *reusability.Service,
+	opts *inbound.Options,
+) (inbound.Result, error) {
 	err := ctx.Err()
 	if err != nil {
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAssemble, err)
 	}
 
-	packageResults, err := fillPackageResults(ctx, job)
+	packageResults, err := fillPackageResults(ctx, facts, calculator, opts)
 	if err != nil {
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAssemble, err)
 	}
 
-	return inbound.Result{ModulePath: job.facts.ModulePath, Packages: packageResults}, nil
+	return inbound.Result{ModulePath: facts.ModulePath, Packages: packageResults}, nil
 }
 
 func collectOptions(opts *inbound.Options) tfoutbound.FactOptions {
@@ -164,22 +123,27 @@ func collectOptions(opts *inbound.Options) tfoutbound.FactOptions {
 	}
 }
 
-func fieldUsageMode(opts *inbound.Options) cohesdomain.FieldUsageMode {
+func fieldUsageMode(opts *inbound.Options) string {
 	if opts.FieldUsageTransitive {
-		return cohesdomain.FieldUsageTransitive
+		return fieldUsageTransitive
 	}
 
-	return cohesdomain.FieldUsageDirect
+	return fieldUsageDirect
 }
 
-func fillPackageResults(ctx context.Context, job *assembleJob) ([]inbound.PackageResult, error) {
-	packageResults := make([]inbound.PackageResult, zero, len(job.facts.Packages))
+func fillPackageResults(
+	ctx context.Context,
+	facts *tfdomain.ProjectFacts,
+	calculator *reusability.Service,
+	opts *inbound.Options,
+) ([]inbound.PackageResult, error) {
+	packageResults := make([]inbound.PackageResult, zero, len(facts.Packages))
 
-	for range job.facts.Packages {
+	for range facts.Packages {
 		packageResults = append(packageResults, inbound.PackageResult{})
 	}
 
-	err := job.runWorkers(ctx, packageWorkerConfig(job, packageResults))
+	err := runWorkers(ctx, packageWorkerConfig(facts, calculator, opts, packageResults))
 	if err != nil {
 		return nil, fmt.Errorf("fill packages: %w", err)
 	}
@@ -201,7 +165,6 @@ func newReusabilityCalculator(
 	compute map[string]bool,
 	weights *metrics.ReusabilityWeights,
 ) (*reusability.Service, error) {
-	// Use nil weights (defaults) when reusability metrics are not selected.
 	resolved := weights
 
 	if !compute[metrics.MetricReusability] && !compute[metrics.MetricCBO] {
@@ -216,45 +179,31 @@ func newReusabilityCalculator(
 	return service, nil
 }
 
-func packageNeeds(compute map[string]bool) metricNeeds {
-	var needs metricNeeds
-
-	if compute[metrics.MetricAMC] {
-		needs |= needComplexity
-	}
-
-	if compute[metrics.MetricLCOM] || compute[metrics.MetricTCC] {
-		needs |= needCohesion
-	}
-
-	return needs
-}
-
 func packageWorkerConfig(
-	job *assembleJob,
+	facts *tfdomain.ProjectFacts,
+	calculator *reusability.Service,
+	opts *inbound.Options,
 	packageResults []inbound.PackageResult,
 ) workerpool.RunConfig {
-	// Fan out one worker task per package into packageResults slots.
 	return workerpool.RunConfig{
-		Workers:   workerpool.Workers(job.opts.Workers, len(job.facts.Packages)),
-		TaskCount: len(job.facts.Packages),
+		Workers:   workerpool.Workers(opts.Workers, len(facts.Packages)),
+		TaskCount: len(facts.Packages),
 		Fn: func(index int) error {
-			packageResults[index] = analyzePackage(&packageJob{
-				facts: job.facts, pkgID: index,
-				reusabilityCalculator: job.reusabilityCalculator,
-				compute:               job.compute,
-				opts:                  job.opts,
-			})
+			packageResults[index] = analyzePackage(facts, index, calculator, opts)
 
 			return nil
 		},
 	}
 }
 
-func typeReusability(job *typeJob, amc, lcom *metrics.MetricResult) metrics.MetricResult {
-	if job.reusabilityCalculator == nil {
+func typeReusability(
+	calculator *reusability.Service,
+	typeFacts *tfdomain.TypeFacts,
+	fieldUsage string,
+) metrics.MetricResult {
+	if calculator == nil {
 		return metrics.MetricResult{}
 	}
 
-	return job.reusabilityCalculator.ComputeForType(job.typeFacts, amc, lcom).Reusability
+	return calculator.ComputeForType(typeFacts, fieldUsage).Reusability
 }

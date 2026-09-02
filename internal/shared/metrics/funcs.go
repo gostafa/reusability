@@ -21,15 +21,6 @@ type (
 		component ReusabilityComponent
 		weight    float64
 	}
-
-	scoreArgs struct {
-		spec      metricSpec
-		inputs    []weightedComponent
-		dropped   []ReusabilityComponent
-		details   []string
-		names     []string
-		weightSum float64
-	}
 )
 
 // AMC computes Average Method Complexity for a type:
@@ -184,14 +175,10 @@ func Reusability(in *ReusabilityInput) MetricResult {
 	spec := metricSpec{MetricReusability, ScopeType, DefinitionReusability}
 
 	if weightSum == zero {
-		return reusabilityUnavailable(&scoreArgs{
-			spec: spec, inputs: inputs, dropped: dropped, details: details,
-		})
+		return reusabilityUnavailable(spec, inputs, dropped, details)
 	}
 
-	return reusabilityValue(&scoreArgs{
-		spec: spec, inputs: inputs, weightSum: weightSum, names: names,
-	})
+	return reusabilityValue(spec, inputs, weightSum, names)
 }
 
 // Validate reports an error when any weight is negative or when the weights
@@ -354,38 +341,48 @@ func orderedSeen(seen map[string]bool) []string {
 	return closure
 }
 
-func reusabilityUnavailable(args *scoreArgs) MetricResult {
-	if len(args.dropped) == len(args.inputs) {
+func reusabilityUnavailable(
+	spec metricSpec,
+	inputs []weightedComponent,
+	dropped []ReusabilityComponent,
+	details []string,
+) MetricResult {
+	if len(dropped) == len(inputs) {
 		return notApplicable(
-			&args.spec,
-			"every component dropped: "+strings.Join(args.details, listSep),
+			&spec,
+			"every component dropped: "+strings.Join(details, listSep),
 		)
 	}
 
 	return notApplicable(
-		&args.spec,
+		&spec,
 		"the applicable components have zero total weight; dropped: "+strings.Join(
-			args.details,
+			details,
 			listSep,
 		),
 	)
 }
 
-func reusabilityValue(args *scoreArgs) MetricResult {
+func reusabilityValue(
+	spec metricSpec,
+	inputs []weightedComponent,
+	weightSum float64,
+	names []string,
+) MetricResult {
 	var value float64
 
-	for i := range args.inputs {
-		in := &args.inputs[i]
+	for i := range inputs {
+		in := &inputs[i]
 
 		if in.component.Applicable {
-			value += in.weight / args.weightSum * in.component.Value
+			value += in.weight / weightSum * in.component.Value
 		}
 	}
 
-	result := applicable(&args.spec, value)
+	result := applicable(&spec, value)
 
-	if len(args.names) > zero {
-		result.Reason = "dropped components: " + strings.Join(args.names, listSep)
+	if len(names) > zero {
+		result.Reason = "dropped components: " + strings.Join(names, listSep)
 	}
 
 	return result

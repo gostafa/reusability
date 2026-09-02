@@ -84,12 +84,7 @@ func collectOneTest(state *testMergeState, fset *token.FileSet, name string) err
 	}
 
 	mode := prepareExternalTest(state, file)
-	ingestTestDecls(&ingestDeclInput{
-		state: state,
-		decl:  nil,
-		name:  name,
-		mode:  mode,
-	}, file)
+	ingestTestDecls(state, name, mode, file)
 
 	return nil
 }
@@ -110,43 +105,40 @@ func prepareExternalTest(state *testMergeState, file *ast.File) testFileMode {
 	return testFileExternal
 }
 
-func ingestTestDecls(base *ingestDeclInput, file *ast.File) {
+func ingestTestDecls(state *testMergeState, name string, mode testFileMode, file *ast.File) {
 	for i := range file.Decls {
-		input := *base
-
-		input.decl = file.Decls[i]
-		ingestOneDecl(&input)
+		ingestOneDecl(state, file.Decls[i], name, mode)
 	}
 }
 
-func ingestOneDecl(input *ingestDeclInput) {
-	if tryIngestImportOrConst(input) {
+func ingestOneDecl(state *testMergeState, decl ast.Decl, name string, mode testFileMode) {
+	if tryIngestImportOrConst(state, decl, name) {
 		return
 	}
 
-	funcDecl, ok := input.decl.(*ast.FuncDecl)
+	funcDecl, ok := decl.(*ast.FuncDecl)
 
 	if !ok {
-		input.state.otherDecls = append(input.state.otherDecls, input.decl)
+		state.otherDecls = append(state.otherDecls, decl)
 
 		return
 	}
 
-	kept := resolveDupFunc(input, funcDecl)
+	kept := resolveDupFunc(state, funcDecl, name, mode)
 
 	if kept == nil {
 		return
 	}
 
-	input.state.otherDecls = append(input.state.otherDecls, kept)
+	state.otherDecls = append(state.otherDecls, kept)
 }
 
-func tryIngestImportOrConst(input *ingestDeclInput) bool {
-	if tryIngestImport(input.state, input.decl) {
+func tryIngestImportOrConst(state *testMergeState, decl ast.Decl, name string) bool {
+	if tryIngestImport(state, decl) {
 		return true
 	}
 
-	return tryIngestConst(input.state, input.decl, input.name)
+	return tryIngestConst(state, decl, name)
 }
 
 func tryIngestImport(state *testMergeState, decl ast.Decl) bool {
@@ -208,25 +200,35 @@ func conflictActionFor(name string) constConflictAction {
 	return constConflictSkip
 }
 
-func resolveDupFunc(input *ingestDeclInput, funcDecl *ast.FuncDecl) *ast.FuncDecl {
+func resolveDupFunc(
+	state *testMergeState,
+	funcDecl *ast.FuncDecl,
+	name string,
+	mode testFileMode,
+) *ast.FuncDecl {
 	key := funcDedupKey(funcDecl)
 
-	if !input.state.seenFuncs[key] {
-		input.state.seenFuncs[key] = true
+	if !state.seenFuncs[key] {
+		state.seenFuncs[key] = true
 
 		return funcDecl
 	}
 
-	return renameOrDropDup(input, funcDecl, key)
+	return renameOrDropDup(state, funcDecl, key, name, mode)
 }
 
-func renameOrDropDup(input *ingestDeclInput, funcDecl *ast.FuncDecl, key string) *ast.FuncDecl {
-	if !allowExtRename(input.name, input.mode) {
+func renameOrDropDup(
+	state *testMergeState,
+	funcDecl *ast.FuncDecl,
+	key, name string,
+	mode testFileMode,
+) *ast.FuncDecl {
+	if !allowExtRename(name, mode) {
 		return nil
 	}
 
 	funcDecl.Name = ast.NewIdent(key + extNameSuffix)
-	input.state.seenFuncs[funcDecl.Name.Name] = true
+	state.seenFuncs[funcDecl.Name.Name] = true
 
 	return funcDecl
 }

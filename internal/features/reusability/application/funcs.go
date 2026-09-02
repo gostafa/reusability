@@ -28,14 +28,8 @@ func NewService(weights *metrics.ReusabilityWeights) (*Service, error) {
 	return &Service{weights: resolved}, nil
 }
 
-// ComputeForType evaluates CBO and the reusability index for one type. The
-// AMC and LCOM results are supplied by the orchestrator.
-func (svc *Service) ComputeForType(
-	typeFacts *typefacts.TypeFacts,
-	amc, lcom *metrics.MetricResult,
-) Result {
-	// Domain compute assembles CBO plus the weighted reusability index.
-	return domain.Compute(&domain.ComputeInput{
-		Type: typeFacts, AMC: *amc, LCOM: *lcom, Weights: svc.weights,
-	})
+// ComputeForType evaluates CBO and the reusability index for one type.
+// fieldUsage is "direct" or "transitive".
+func (svc *Service) ComputeForType(typeFacts *typefacts.TypeFacts, fieldUsage string) Result {
+	return domain.Compute(typeFacts, svc.weights, fieldUsage)
 }

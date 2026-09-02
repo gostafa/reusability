@@ -101,13 +101,6 @@ type (
 		kept       []*ast.ImportSpec
 	}
 
-	ingestDeclInput struct {
-		state *testMergeState
-		decl  ast.Decl
-		name  string
-		mode  testFileMode
-	}
-
 	testFileMode int
 
 	constConflictInput struct {
@@ -128,13 +121,6 @@ type (
 	runOptions struct {
 		pattern string
 		dryRun  bool
-	}
-
-	commitInput struct {
-		pkg     *packageInfo
-		writes  []writeOp
-		deletes []string
-		opts    runOptions
 	}
 
 	docSectionsInput struct {
@@ -162,24 +148,9 @@ type (
 		decls []ast.Decl
 	}
 
-	testWriteInput struct {
-		pkg    *packageInfo
-		scan   *prodScanResult
-		writes []writeOp
-	}
-
 	filterImportsInput struct {
 		importPath string
 		imports    []*ast.ImportSpec
-	}
-
-	scanAssembleInput struct {
-		pkg   *packageInfo
-		fset  *token.FileSet
-		doc   string
-		prod  []string
-		test  []string
-		decls []pkgDecl
 	}
 
 	prodAccumulateState struct {

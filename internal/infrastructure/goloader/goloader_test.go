@@ -349,12 +349,10 @@ func (t *T) M() {}
 	tn, _ := pkg.Types.Scope().Lookup("T").(*types.TypeName)
 	named, _ := tn.Type().(*types.Named)
 
-	got := sortedMethods(&sortedMethodsRequest{
-		fset:  pkg.Fset,
-		opts:  &extractorOptions{},
-		idx:   &syntaxIndex{funcDecls: map[*types.Func]*ast.FuncDecl{}},
-		named: named,
-	})
+	got := sortedMethods(&extractCtx{
+		pkg: pkg,
+		idx: &syntaxIndex{funcDecls: map[*types.Func]*ast.FuncDecl{}},
+	}, named)
 	if len(got) != 0 {
 		t.Fatalf("sortedMethods = %d, want 0", len(got))
 	}

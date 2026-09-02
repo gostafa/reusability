@@ -49,7 +49,7 @@ func TestResolvePolicyRequiresRules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 || got[0].Min != 0.8 || source != policySourceFlagRules {
+	if len(got) != 1 || got[0].minimum != 0.8 || source != policySourceFlagRules {
 		t.Fatalf("flag rules = %+v, source = %q", got, source)
 	}
 
@@ -60,13 +60,11 @@ func TestResolvePolicyRequiresRules(t *testing.T) {
 }
 
 func TestRunEarlyErrorPaths(t *testing.T) {
-	deps := defaultCLIDeps()
-
-	if code := execute([]string{"--verbose", "--dependency-scope=nope"}, deps); code != 1 {
+	if code := execute([]string{"--verbose", "--dependency-scope=nope"}); code != 1 {
 		t.Fatalf("invalid dependency scope exit = %d, want 1", code)
 	}
 
-	if code := execute([]string{"--reusability-weight-cohesion=-1"}, deps); code != 1 {
+	if code := execute([]string{"--reusability-weight-cohesion=-1"}); code != 1 {
 		t.Fatalf("invalid reusability weight exit = %d, want 1", code)
 	}
 
@@ -75,27 +73,28 @@ func TestRunEarlyErrorPaths(t *testing.T) {
 		"--reusability-weight-coupling=0",
 		"--reusability-weight-testability=0",
 		"--reusability-weight-documentation=0",
-	}, deps); code != 1 {
+	}); code != 1 {
 		t.Fatalf("all-zero reusability weights exit = %d, want 1", code)
 	}
 
 	badProfile := filepath.Join(t.TempDir(), "missing", "cpu.prof")
-	if code := execute([]string{"--cpu-profile=" + badProfile}, deps); code != 1 {
+	if code := execute([]string{"--cpu-profile=" + badProfile}); code != 1 {
 		t.Fatalf("bad CPU profile exit = %d, want 1", code)
 	}
 
 	badTemp := filepath.Join(t.TempDir(), "missing")
 	t.Setenv("TMPDIR", badTemp)
 	t.Setenv("TMP", badTemp)
-	if code := runWebHelp(deps); code != 1 {
+	if code := runWebHelp(); code != 1 {
 		t.Fatalf("web help with bad temp dir exit = %d, want 1", code)
 	}
 }
 
 func TestRunPassesReusabilityWeights(t *testing.T) {
 	var got reusability.Weights
-	deps := defaultCLIDeps()
-	deps.analyze = func(_ context.Context, cfg *reusability.Config) (reusability.Report, error) {
+	orig := analyzeFn
+	t.Cleanup(func() { analyzeFn = orig })
+	analyzeFn = func(_ context.Context, cfg *reusability.Config) (reusability.Report, error) {
 		got = cfg.ReusabilityWeights
 
 		return reusability.Report{}, nil
@@ -106,7 +105,7 @@ func TestRunPassesReusabilityWeights(t *testing.T) {
 		"--reusability-weight-coupling=0.2",
 		"--reusability-weight-testability=0.3",
 		"--reusability-weight-documentation=0.4",
-	}, deps); code != 0 {
+	}); code != 0 {
 		t.Fatalf("exit = %d, want 0", code)
 	}
 
@@ -119,14 +118,15 @@ func TestRunPassesReusabilityWeights(t *testing.T) {
 }
 
 func TestRunCheckRequiresRules(t *testing.T) {
-	if code := execute([]string{"--check", "./..."}, defaultCLIDeps()); code != 2 {
+	if code := execute([]string{"--check", "./..."}); code != 2 {
 		t.Fatalf("check without rules exit = %d, want 2", code)
 	}
 }
 
 func TestRunCheckWithRules(t *testing.T) {
-	deps := defaultCLIDeps()
-	deps.analyze = func(_ context.Context, _ *reusability.Config) (reusability.Report, error) {
+	orig := analyzeFn
+	t.Cleanup(func() { analyzeFn = orig })
+	analyzeFn = func(_ context.Context, _ *reusability.Config) (reusability.Report, error) {
 		return reusability.Report{Packages: []reusability.PackageReport{{
 			Path: "example.com/p",
 			Types: []reusability.TypeReport{{
@@ -138,14 +138,15 @@ func TestRunCheckWithRules(t *testing.T) {
 		}}}, nil
 	}
 
-	if code := execute([]string{"--check", `--rule=**:0.8`}, deps); code != 3 {
+	if code := execute([]string{"--check", `--rule=**:0.8`}); code != 3 {
 		t.Fatalf("policy violation exit = %d, want 3", code)
 	}
 }
 
 func TestRunPolicySourceLogged(t *testing.T) {
-	deps := defaultCLIDeps()
-	deps.analyze = func(_ context.Context, _ *reusability.Config) (reusability.Report, error) {
+	orig := analyzeFn
+	t.Cleanup(func() { analyzeFn = orig })
+	analyzeFn = func(_ context.Context, _ *reusability.Config) (reusability.Report, error) {
 		return reusability.Report{Packages: []reusability.PackageReport{{
 			Path: "p",
 			Types: []reusability.TypeReport{{
@@ -157,19 +158,25 @@ func TestRunPolicySourceLogged(t *testing.T) {
 		}}}, nil
 	}
 
-	if code := execute([]string{"--check", `--rule=**:0.7`}, deps); code != 0 {
+	if code := execute([]string{"--check", `--rule=**:0.7`}); code != 0 {
 		t.Fatalf("passing check exit = %d, want 0", code)
 	}
 }
 
 func TestResolvePolicyValidatesRules(t *testing.T) {
-	rules, _, err := resolvePolicy(ruleList{items: []ruleSpec{
+	specs, _, err := resolvePolicy(ruleList{items: []ruleSpec{
 		{pattern: "**/internal/**", minimum: 0.8},
 		{pattern: "**", minimum: 0.6},
 	}})
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	rules := make([]policydomain.Rule, 0, len(specs))
+	for i := range specs {
+		rules = append(rules, policydomain.Rule{Pattern: specs[i].pattern, Min: specs[i].minimum})
+	}
+
 	if err := policydomain.Validate(rules); err != nil {
 		t.Fatal(err)
 	}

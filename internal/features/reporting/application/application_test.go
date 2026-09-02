@@ -170,10 +170,9 @@ func TestRenderCSVWriteErrors(t *testing.T) {
 	}
 	big.Packages[0] = pkg
 
-	if err := render(&renderInput{
-		writer: &failWriter{allow: 0, err: sentinel}, report: &big,
-		format: domain.FormatCSV, opts: domain.TextOptions{},
-	}); !errors.Is(err, sentinel) {
+	if err := render(
+		&failWriter{allow: 0, err: sentinel}, &big, domain.FormatCSV, domain.TextOptions{},
+	); !errors.Is(err, sentinel) {
 		t.Fatalf("csv write error = %v, want sentinel", err)
 	}
 }
@@ -286,10 +285,7 @@ func TestRenderJSONContract(t *testing.T) {
 func TestRenderUnknownFormat(t *testing.T) {
 	t.Parallel()
 
-	err := render(&renderInput{
-		writer: io.Discard, report: ptrSample(),
-		format: domain.Format("xml"), opts: domain.TextOptions{},
-	})
+	err := render(io.Discard, ptrSample(), domain.Format("xml"), domain.TextOptions{})
 	if err == nil {
 		t.Fatal("unknown format should error")
 	}

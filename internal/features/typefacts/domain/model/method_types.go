@@ -10,10 +10,15 @@ import (
 type (
 	// FunctionFacts describes a package-level function.
 	FunctionFacts struct {
-		Name     string
-		Pos      Position
+		// Name is the function identifier.
+		Name string
+		// Pos is the source location of the function.
+		Pos Position
+		// Branches counts control-flow constructs for cyclomatic complexity.
 		Branches BranchStats
-		Lines    int
+		// Lines is the function body line count.
+		Lines int
+		// Exported reports whether the function name is exported.
 		Exported bool
 	}
 

@@ -4,8 +4,6 @@
 package application
 
 import (
-	"io"
-
 	"github.com/gostafa/reusability/internal/features/reporting/domain"
 	"github.com/gostafa/reusability/internal/features/reporting/ports/outbound"
 	"github.com/gostafa/reusability/reusability"
@@ -14,9 +12,13 @@ import (
 type (
 	// WriteRequest holds the inputs for Write.
 	WriteRequest struct {
-		Sink    outbound.Sink
-		Format  domain.Format
-		Report  reusability.Report
+		// Sink is the destination that receives the rendered report bytes.
+		Sink outbound.Sink
+		// Format selects the report rendering format (text, json, csv, or web).
+		Format domain.Format
+		// Report is the analysis report to render.
+		Report reusability.Report
+		// Options controls text-format rendering (color and explain notes).
 		Options domain.TextOptions
 	}
 
@@ -86,17 +88,5 @@ type (
 		Module string `json:"module"`
 		// Report is the same document the JSON format emits.
 		Report jsonReport `json:"report"`
-	}
-
-	renderInput struct {
-		writer io.Writer
-		report *reusability.Report
-		format domain.Format
-		opts   domain.TextOptions
-	}
-
-	renderDispatcher struct {
-		render func(*renderInput) error
-		format domain.Format
 	}
 )

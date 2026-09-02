@@ -15,11 +15,7 @@ type (
 
 	// Calculator evaluates reusability for one type.
 	Calculator interface {
-		ComputeForType(
-			typeFacts *typefacts.TypeFacts,
-			amc *metrics.MetricResult,
-			lcom *metrics.MetricResult,
-		) Result
+		ComputeForType(typeFacts *typefacts.TypeFacts, fieldUsage string) Result
 	}
 
 	// Service is the reusability application service.

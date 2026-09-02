@@ -68,12 +68,6 @@ type (
 		pkgs       []*packages.Package
 	}
 
-	loadedPackages struct {
-		opts *outbound.FactOptions
-		deps *loaderDeps
-		pkgs []*packages.Package
-	}
-
 	selectLoadedRequest struct {
 		loaded   []*packages.Package
 		opts     *outbound.FactOptions
@@ -92,52 +86,13 @@ type (
 		positions  []token.Pos
 	}
 
-	extractTypeRequest struct {
-		pkg   *packages.Package
-		tn    *types.TypeName
-		named *types.Named
-		opts  *extractorOptions
-		idx   *syntaxIndex
-	}
-
-	methodBuildRequest struct {
-		req        *extractTypeRequest
-		refs       *refCollector
-		fieldIndex map[*types.Var]int
-	}
-
-	typeRefsDocsRequest struct {
-		out            *domain.TypeExtract
-		req            *extractTypeRequest
-		refs           *refCollector
-		fieldPositions []token.Pos
-		docMethods     []methodDocInput
-	}
-
-	memberDocsRequest struct {
-		typeDocs       map[types.Object]bool
-		fieldDocs      []docRange
-		tn             *types.TypeName
-		fields         []domain.FieldFacts
-		fieldPositions []token.Pos
-		methods        []methodDocInput
-	}
-
-	methodFactsRequest struct {
-		m           methodDecl
-		pkg         *packages.Package
-		refs        *refCollector
-		fieldIndex  map[*types.Var]int
-		methodIndex map[*types.Func]int
-		opts        *extractorOptions
-		fieldCount  int
-	}
-
-	sortedMethodsRequest struct {
-		fset  *token.FileSet
-		named *types.Named
-		opts  *extractorOptions
-		idx   *syntaxIndex
+	// extractCtx is the per-package extraction collaborator (CBO≤1 via *syntaxIndex).
+	extractCtx struct {
+		pkg              *packages.Package
+		idx              *syntaxIndex
+		analyzed         map[string]bool
+		baseDir          string
+		includeGenerated bool
 	}
 
 	skipPosRequest struct {
@@ -179,21 +134,6 @@ type (
 		self     *types.TypeName
 		analyzed map[string]bool
 		t        *types.Named
-	}
-
-	namedTypeCollect struct {
-		out   *domain.PackageExtract
-		pkg   *packages.Package
-		scope *types.Scope
-		opts  *extractorOptions
-		idx   *syntaxIndex
-	}
-
-	structFieldBuilder struct {
-		fields         *[]domain.FieldFacts
-		fieldIndex     map[*types.Var]int
-		fieldPositions *[]token.Pos
-		refs           *refCollector
 	}
 
 	typeSpecIndex struct {

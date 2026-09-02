@@ -79,26 +79,25 @@ func buildScanResult(pkg *packageInfo, prod, test []string) (*prodScanResult, er
 		return nil, fmt.Errorf("parse prod decls: %w", err)
 	}
 
-	return newProdScanResult(&scanAssembleInput{
-		pkg:   pkg,
-		prod:  prod,
-		test:  test,
-		fset:  fset,
-		decls: decls,
-		doc:   doc,
-	}), nil
+	return newProdScanResult(pkg, fset, doc, prod, test, decls), nil
 }
 
-func newProdScanResult(input *scanAssembleInput) *prodScanResult {
+func newProdScanResult(
+	pkg *packageInfo,
+	fset *token.FileSet,
+	doc string,
+	prod, test []string,
+	decls []pkgDecl,
+) *prodScanResult {
 	return &prodScanResult{
-		prodFiles:  input.prod,
-		testFiles:  input.test,
-		allDecls:   input.decls,
-		packageDoc: choosePackageDoc(input.doc, input.pkg.Name),
-		pkgImports: collectProdImports(input.fset, input.pkg.Dir, input.prod),
+		prodFiles:  prod,
+		testFiles:  test,
+		allDecls:   decls,
+		packageDoc: choosePackageDoc(doc, pkg.Name),
+		pkgImports: collectProdImports(fset, pkg.Dir, prod),
 		license:    extractLicense(),
-		fset:       input.fset,
-		pkgName:    input.pkg.Name,
+		fset:       fset,
+		pkgName:    pkg.Name,
 	}
 }
 
@@ -209,12 +208,7 @@ func applyRefactor(pkg *packageInfo, scan *prodScanResult, opts runOptions) erro
 
 	deletes := planDeletes(scan.prodFiles, scan.testFiles, testFileName(pkg.Name))
 
-	err = commitWrites(&commitInput{
-		pkg:     pkg,
-		writes:  writes,
-		deletes: deletes,
-		opts:    opts,
-	})
+	err = commitWrites(pkg, writes, deletes, opts)
 	if err != nil {
 		return fmt.Errorf(fmtCommitWrites, err)
 	}
@@ -228,11 +222,7 @@ func buildAllWrites(pkg *packageInfo, scan *prodScanResult) ([]writeOp, error) {
 		return nil, fmt.Errorf("doc and prod writes: %w", err)
 	}
 
-	result, err := appendTestWrite(&testWriteInput{
-		writes: writes,
-		pkg:    pkg,
-		scan:   scan,
-	})
+	result, err := appendTestWrite(writes, pkg, scan)
 	if err != nil {
 		return nil, fmt.Errorf("append test write: %w", err)
 	}
@@ -340,22 +330,22 @@ func formatKindWrite(input *kindWriteInput) (writeOp, error) {
 	return writeOp{name: input.name, content: content}, nil
 }
 
-func appendTestWrite(input *testWriteInput) ([]writeOp, error) {
-	if len(input.scan.testFiles) == countZero {
-		return input.writes, nil
+func appendTestWrite(writes []writeOp, pkg *packageInfo, scan *prodScanResult) ([]writeOp, error) {
+	if len(scan.testFiles) == countZero {
+		return writes, nil
 	}
 
 	merged, err := mergeTests(&mergeTestsInput{
-		fset:      input.scan.fset,
-		pkg:       *input.pkg,
-		testFiles: input.scan.testFiles,
-		license:   input.scan.license,
+		fset:      scan.fset,
+		pkg:       *pkg,
+		testFiles: scan.testFiles,
+		license:   scan.license,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("merge tests: %w", err)
 	}
 
-	return append(input.writes, writeOp{name: testFileName(input.pkg.Name), content: merged}), nil
+	return append(writes, writeOp{name: testFileName(pkg.Name), content: merged}), nil
 }
 
 func testFileName(pkgName string) string {

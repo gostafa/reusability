@@ -15,20 +15,34 @@ type (
 
 	// MetricDoc is one entry in the metrics guide.
 	MetricDoc struct {
-		FormulaLaTeX   string
-		NotApplicable  string
-		FullName       string
-		Scope          DocScope
-		Definition     string
-		FormulaMathML  string
-		HowCalculated  string
-		Example        string
-		Label          string
+		// FormulaLaTeX is the metric formula in LaTeX.
+		FormulaLaTeX string
+		// NotApplicable explains when the metric does not apply.
+		NotApplicable string
+		// FullName is the human-readable metric title.
+		FullName string
+		// Scope classifies whether the metric is type- or package-level.
+		Scope DocScope
+		// Definition is the formula/version identifier for the metric.
+		Definition string
+		// FormulaMathML is the metric formula in MathML.
+		FormulaMathML string
+		// HowCalculated describes how the tool computes the value.
+		HowCalculated string
+		// Example is a short worked example of the metric.
+		Example string
+		// Label is the short column header for the metric.
+		Label string
+		// Interpretation explains how to read high versus low scores.
 		Interpretation string
-		Name           string
-		Direction      string
-		Summary        string
-		Bounded        bool
+		// Name is the canonical metric identifier.
+		Name string
+		// Direction is whether higher or lower values are better.
+		Direction string
+		// Summary is a one-line description of the metric.
+		Summary string
+		// Bounded is true when the metric is normalized to [0, 1].
+		Bounded bool
 	}
 
 	// Format names a report rendering format.
@@ -86,40 +100,10 @@ type (
 		types  []string
 	}
 
-	emitArgs struct {
-		node      *treeNode
-		summaries map[*treeNode]*treeSummary
-		prefix    string
-		connector string
-	}
-
-	typeRowArgs struct {
-		node      *treeNode
-		summary   *treeSummary
-		prefix    string
-		connector string
-		index     int
-	}
-
 	paintArgs struct {
 		text  string
 		style string
 		color bool
-	}
-
-	footerArgs struct {
-		report *reusability.Report
-		opts   TextOptions
-		sawNA  bool
-	}
-
-	branchEmitArgs struct {
-		node        *treeNode
-		summary     *treeSummary
-		summaries   map[*treeNode]*treeSummary
-		childPrefix string
-		typeCount   int
-		total       int
 	}
 
 	rowWriteArgs struct {
@@ -146,12 +130,5 @@ type (
 		index   map[string]int
 		entries []noteEntry
 		count   int
-	}
-
-	cellPadArgs struct {
-		row  *rowWriteArgs
-		cell *tableCell
-		idx  int
-		last int
 	}
 )

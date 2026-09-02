@@ -7,8 +7,18 @@ import (
 	"testing"
 
 	typefacts "github.com/gostafa/reusability/internal/features/typefacts/domain"
+	"github.com/gostafa/reusability/internal/shared/bitset"
 	"github.com/gostafa/reusability/internal/shared/metrics"
 )
+
+func fieldSet(size int, idx ...int) bitset.FieldSet {
+	s := bitset.NewFieldSet(size)
+	for _, i := range idx {
+		s.Set(i)
+	}
+
+	return s
+}
 
 // White-box: weight defaulting and validation at construction.
 func TestNewServiceDefaultsAndValidation(t *testing.T) {
@@ -33,14 +43,17 @@ func TestServiceComputeForType(t *testing.T) {
 	}
 
 	tf := &typefacts.TypeFacts{
-		ReferencedTypeIDs:         []int{1, 2},
+		ReferencedTypeIDs: []int{1, 2},
+		Fields:            []typefacts.FieldFacts{{Name: "a"}, {Name: "b"}},
+		Methods: []typefacts.MethodFacts{
+			{Name: "M1", FieldsUsed: fieldSet(2, 0, 1), Branches: typefacts.BranchStats{Ifs: 1}},
+			{Name: "M2", FieldsUsed: fieldSet(2, 0, 1), Branches: typefacts.BranchStats{}},
+		},
 		ExportedMembers:           2,
 		DocumentedExportedMembers: 2,
 	}
 
-	amc := metrics.AMC(2, 2)
-	lcom := metrics.LCOM(2, 2, 2)
-	got := svc.ComputeForType(tf, &amc, &lcom)
+	got := svc.ComputeForType(tf, "direct")
 	if got.CBO != metrics.CBO(2) {
 		t.Errorf("CBO = %+v, want %+v", got.CBO, metrics.CBO(2))
 	}
@@ -62,14 +75,17 @@ func TestServiceEndToEnd(t *testing.T) {
 	}
 
 	tf := &typefacts.TypeFacts{
-		ReferencedTypeIDs:         []int{1, 2, 3},
+		ReferencedTypeIDs: []int{1, 2, 3},
+		Fields:            []typefacts.FieldFacts{{Name: "a"}, {Name: "b"}},
+		Methods: []typefacts.MethodFacts{
+			{Name: "M1", FieldsUsed: fieldSet(2, 0), Branches: typefacts.BranchStats{Ifs: 3}},
+			{Name: "M2", FieldsUsed: fieldSet(2, 1), Branches: typefacts.BranchStats{}},
+		},
 		ExportedMembers:           1,
 		DocumentedExportedMembers: 1,
 	}
 
-	amc := metrics.AMC(4, 2)
-	lcom := metrics.LCOM(3, 2, 2)
-	got := svc.ComputeForType(tf, &amc, &lcom)
+	got := svc.ComputeForType(tf, "direct")
 	if got.CBO.Value != 3 {
 		t.Errorf("CBO = %v, want 3", got.CBO.Value)
 	}

@@ -3,10 +3,6 @@
 
 package domain
 
-import (
-	typefacts "github.com/gostafa/reusability/internal/features/typefacts/domain"
-)
-
 type (
 	// Scope selects which imports count toward efferent coupling.
 	Scope string
@@ -43,13 +39,5 @@ type (
 		path       string
 		modulePath string
 		scope      Scope
-	}
-
-	edgeJob struct {
-		graph    *DependencyGraph
-		facts    *typefacts.ProjectFacts
-		analyzed map[string]int
-		scope    Scope
-		pkgID    int
 	}
 )

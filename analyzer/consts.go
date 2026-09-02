@@ -21,7 +21,7 @@ in the golangci-lint settings block.`
 	floatBits             = 64
 	defaultPackagePattern = "./..."
 
-	errFmtUnmarshal = "Settings.UnmarshalJSON: %w"
+	errFmtUnmarshal = "UnmarshalSettings: %w"
 	errFmtValidate  = "validate: %w"
 	errFmtRemap     = "remapKebabKeys: %w"
 	errFmtQuoted    = "%w: %q"

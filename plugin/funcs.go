@@ -4,6 +4,7 @@
 package plugin
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/golangci/plugin-module-register/register"
@@ -26,12 +27,32 @@ func registerModule() int {
 
 // New constructs the Module Plugin from golangci-lint custom settings.
 func New(raw any) (*Plugin, error) {
-	settings, err := register.DecodeSettings[analyzer.Settings](raw)
+	settings, err := decodePluginSettings(raw)
 	if err != nil {
 		return nil, fmt.Errorf("New: %w", err)
 	}
 
 	return &Plugin{settings: settings}, nil
+}
+
+func decodePluginSettings(raw any) (analyzer.Settings, error) {
+	if raw == nil {
+		return analyzer.Settings{}, nil
+	}
+
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return analyzer.Settings{}, fmt.Errorf("marshal settings: %w", err)
+	}
+
+	var settings analyzer.Settings
+
+	err = analyzer.UnmarshalSettings(data, &settings)
+	if err != nil {
+		return analyzer.Settings{}, fmt.Errorf("decode settings: %w", err)
+	}
+
+	return settings, nil
 }
 
 // BuildAnalyzers returns the reusability go/analysis Analyzer.

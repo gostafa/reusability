@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 )
 
-func commitWrites(input *commitInput) error {
-	err := pickCommitErr(input)
+func commitWrites(pkg *packageInfo, writes []writeOp, deletes []string, opts runOptions) error {
+	err := pickCommitErr(pkg, writes, deletes, opts)
 	if err != nil {
 		return fmt.Errorf(fmtCommitWrites, err)
 	}
@@ -18,15 +18,17 @@ func commitWrites(input *commitInput) error {
 	return nil
 }
 
-func pickCommitErr(input *commitInput) error {
-	runners := []func(*commitInput) error{commitDisk, printDryRun}
-	idx := countZero
+func pickCommitErr(pkg *packageInfo, writes []writeOp, deletes []string, opts runOptions) error {
+	if opts.dryRun {
+		err := printDryRun(pkg, writes, deletes)
+		if err != nil {
+			return fmt.Errorf("commit runner: %w", err)
+		}
 
-	if input.opts.dryRun {
-		idx = countOne
+		return nil
 	}
 
-	err := runners[idx](input)
+	err := commitDisk(pkg, writes, deletes)
 	if err != nil {
 		return fmt.Errorf("commit runner: %w", err)
 	}
@@ -34,18 +36,18 @@ func pickCommitErr(input *commitInput) error {
 	return nil
 }
 
-func printDryRun(input *commitInput) error {
-	err := printLine(fmt.Sprintf("=== %s ===", input.pkg.ImportPath))
+func printDryRun(pkg *packageInfo, writes []writeOp, deletes []string) error {
+	err := printLine(fmt.Sprintf("=== %s ===", pkg.ImportPath))
 	if err != nil {
 		return fmt.Errorf("print header: %w", err)
 	}
 
-	err = printWriteOps(input.writes)
+	err = printWriteOps(writes)
 	if err != nil {
 		return fmt.Errorf("print writes: %w", err)
 	}
 
-	err = printDeleteOps(input.deletes)
+	err = printDeleteOps(deletes)
 	if err != nil {
 		return fmt.Errorf("print deletes: %w", err)
 	}
@@ -77,13 +79,13 @@ func printDeleteOps(deletes []string) error {
 	return nil
 }
 
-func commitDisk(input *commitInput) error {
-	err := writeAll(input.pkg.Dir, input.writes)
+func commitDisk(pkg *packageInfo, writes []writeOp, deletes []string) error {
+	err := writeAll(pkg.Dir, writes)
 	if err != nil {
 		return fmt.Errorf("write all: %w", err)
 	}
 
-	err = deleteAll(input.pkg.Dir, input.deletes)
+	err = deleteAll(pkg.Dir, deletes)
 	if err != nil {
 		return fmt.Errorf("delete all: %w", err)
 	}

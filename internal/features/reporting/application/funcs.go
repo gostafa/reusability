@@ -23,9 +23,7 @@ func Write(req *WriteRequest) error {
 		return fmt.Errorf("open sink: %w", err)
 	}
 
-	renderErr := render(&renderInput{
-		writer: writer, report: &req.Report, format: req.Format, opts: req.Options,
-	})
+	renderErr := render(writer, &req.Report, req.Format, req.Options)
 	closeErr := writer.Close()
 
 	if renderErr != nil {
@@ -162,8 +160,13 @@ func metricJSON(metric *reusability.MetricResult) jsonMetric {
 	return out
 }
 
-func render(input *renderInput) error {
-	err := dispatchRender(input)
+func render(
+	writer io.Writer,
+	report *reusability.Report,
+	format domain.Format,
+	opts domain.TextOptions,
+) error {
+	err := dispatchRender(writer, report, format, opts)
 	if err != nil {
 		return fmt.Errorf("render: %w", err)
 	}
@@ -171,68 +174,33 @@ func render(input *renderInput) error {
 	return nil
 }
 
-func dispatchRender(input *renderInput) error {
-	dispatchers := newRenderDispatchers()
-
-	for i := range dispatchers {
-		if dispatchers[i].format != input.format {
-			continue
-		}
-
-		err := dispatchers[i].render(input)
-		if err != nil {
-			return fmt.Errorf("dispatch render: %w", err)
-		}
-
-		return nil
-	}
-
-	return fmt.Errorf("%w: %q", errUnknownFormat, input.format)
-}
-
-func newRenderDispatchers() []renderDispatcher {
-	return []renderDispatcher{
-		{format: domain.FormatText, render: renderText},
-		{format: domain.FormatJSON, render: renderJSONInput},
-		{format: domain.FormatCSV, render: renderCSVInput},
-		{format: domain.FormatWeb, render: renderWebInput},
+func dispatchRender(
+	writer io.Writer,
+	report *reusability.Report,
+	format domain.Format,
+	opts domain.TextOptions,
+) error {
+	switch format {
+	case domain.FormatText:
+		return renderText(writer, report, opts)
+	case domain.FormatJSON:
+		return renderJSON(writer, report)
+	case domain.FormatCSV:
+		return renderCSV(writer, report)
+	case domain.FormatWeb:
+		return renderWeb(writer, report)
+	default:
+		return fmt.Errorf("%w: %q", errUnknownFormat, format)
 	}
 }
 
-func renderJSONInput(input *renderInput) error {
-	err := renderJSON(input.writer, input.report)
-	if err != nil {
-		return fmt.Errorf("render json input: %w", err)
-	}
-
-	return nil
-}
-
-func renderCSVInput(input *renderInput) error {
-	err := renderCSV(input.writer, input.report)
-	if err != nil {
-		return fmt.Errorf("render csv input: %w", err)
-	}
-
-	return nil
-}
-
-func renderWebInput(input *renderInput) error {
-	err := renderWeb(input.writer, input.report)
-	if err != nil {
-		return fmt.Errorf("render web input: %w", err)
-	}
-
-	return nil
-}
-
-func renderText(input *renderInput) error {
-	text, err := domain.Text(input.report, input.opts)
+func renderText(writer io.Writer, report *reusability.Report, opts domain.TextOptions) error {
+	text, err := domain.Text(report, opts)
 	if err != nil {
 		return fmt.Errorf("build text: %w", err)
 	}
 
-	err = writeFullString(input.writer, text, "write text")
+	err = writeFullString(writer, text, "write text")
 	if err != nil {
 		return fmt.Errorf("write text body: %w", err)
 	}

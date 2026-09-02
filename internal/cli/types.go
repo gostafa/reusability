@@ -4,29 +4,13 @@
 package cli
 
 import (
-	"context"
 	"flag"
 	"log/slog"
-	"os"
 
-	policydomain "github.com/gostafa/reusability/internal/features/policy/domain"
-	reportingdomain "github.com/gostafa/reusability/internal/features/reporting/domain"
-	"github.com/gostafa/reusability/internal/features/reporting/ports/outbound"
 	"github.com/gostafa/reusability/reusability"
 )
 
 type (
-	cliDeps struct {
-		analyze        func(context.Context, *reusability.Config) (reusability.Report, error)
-		isTerminal     func() bool
-		createHelpTemp func(dir, pattern string) (*os.File, error)
-		closeHelpFile  func(*os.File) error
-		writeDocs      func(outbound.Sink, string) error
-		openBrowser    func(string) error
-		startCPU       func(string) (func() error, error)
-		writeHeap      func(string) error
-	}
-
 	ruleSpec struct {
 		pattern string
 		minimum float64
@@ -60,15 +44,17 @@ type (
 		rules                          ruleList
 	}
 
+	// runtimeConfig holds parsed CLI runtime state. Named module types are
+	// limited to analysis config so coupling stays low.
 	runtimeConfig struct {
 		logger        *slog.Logger
-		deps          *cliDeps
-		format        reportingdomain.Format
+		format        string
 		output        string
 		policySource  string
 		cpuProfile    string
 		memoryProfile string
-		rules         []policydomain.Rule
+		rulePatterns  []string
+		ruleMins      []float64
 		analysis      reusability.Config
 		explain       bool
 		gating        bool
@@ -83,13 +69,13 @@ type (
 
 	gatingResult struct {
 		source string
-		rules  []policydomain.Rule
+		rules  []ruleSpec
 		code   int
 		ok     bool
 	}
 
 	formatResult struct {
-		format reportingdomain.Format
+		format string
 		code   int
 		ok     bool
 	}
@@ -104,12 +90,5 @@ type (
 		flagSet *flag.FlagSet
 		vals    *flagValues
 		logger  *slog.Logger
-	}
-
-	assembleArgs struct {
-		in      buildArgs
-		format  reportingdomain.Format
-		gating  gatingResult
-		weights reusability.Weights
 	}
 )

@@ -12,16 +12,27 @@ import (
 type (
 	// Options configures one project analysis request.
 	Options struct {
-		Directory            string
-		DependencyScope      string
-		Patterns             []string
-		BuildTags            []string
-		Weights              metrics.ReusabilityWeights
-		Workers              int
-		IncludeTests         bool
-		IncludeGenerated     bool
+		// Directory is the module root used when resolving package patterns.
+		Directory string
+		// DependencyScope selects which imports count toward coupling
+		// (project, module, or all).
+		DependencyScope string
+		// Patterns are go/packages patterns to load (for example ./...).
+		Patterns []string
+		// BuildTags are extra build tags passed to package loading.
+		BuildTags []string
+		// Weights are the reusability component weights for this run.
+		Weights metrics.ReusabilityWeights
+		// Workers is the max concurrent package workers (0 = auto).
+		Workers int
+		// IncludeTests includes test files and test packages when true.
+		IncludeTests bool
+		// IncludeGenerated includes generated source files when true.
+		IncludeGenerated bool
+		// FieldUsageTransitive counts transitive field usage for cohesion.
 		FieldUsageTransitive bool
-		ContinueOnError      bool
+		// ContinueOnError skips packages that fail to load or type-check.
+		ContinueOnError bool
 	}
 
 	// TypeResult is one type's analysis outcome.

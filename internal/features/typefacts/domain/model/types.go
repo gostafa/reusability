@@ -26,8 +26,11 @@ type (
 
 	// DeclarationFacts is the common name/position/export metadata.
 	DeclarationFacts struct {
-		Name     string
-		Pos      Position
+		// Name is the declaration identifier.
+		Name string
+		// Pos is the source location of the declaration.
+		Pos Position
+		// Exported reports whether the declaration name is exported.
 		Exported bool
 	}
 )

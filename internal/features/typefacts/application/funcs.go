@@ -59,9 +59,7 @@ func appendPackages(
 	typeID := zero
 
 	for pkgID := range extracts {
-		pkg, next := packageFacts(&packageBuild{
-			pkgID: pkgID, extract: extracts[pkgID], typeID: typeID, idByKey: idByKey, facts: facts,
-		})
+		pkg, next := packageFacts(facts, &extracts[pkgID], idByKey, pkgID, typeID)
 
 		typeID = next
 
@@ -95,27 +93,32 @@ func indexTypeKeys(extracts []domain.PackageExtract) map[string]int {
 	return idByKey
 }
 
-func packageFacts(build *packageBuild) (pkg domain.PackageFacts, nextTypeID int) {
+func packageFacts(
+	facts *domain.ProjectFacts,
+	extract *domain.PackageExtract,
+	idByKey map[string]int,
+	pkgID, typeID int,
+) (pkg domain.PackageFacts, nextTypeID int) {
 	pkg = domain.PackageFacts{
-		ID:       build.pkgID,
-		Path:     build.extract.Path,
-		InModule: build.extract.InModule,
-		Imports:  sortedUnique(build.extract.Imports, build.extract.Path),
-		TypeIDs:  make([]int, zero, len(build.extract.Types)),
+		ID:       pkgID,
+		Path:     extract.Path,
+		InModule: extract.InModule,
+		Imports:  sortedUnique(extract.Imports, extract.Path),
+		TypeIDs:  make([]int, zero, len(extract.Types)),
 	}
 
-	for index := range build.extract.Types {
-		pkg.TypeIDs = append(pkg.TypeIDs, build.typeID)
-		build.facts.Types = append(build.facts.Types, typeFacts(&typeBuild{
-			id:      build.typeID,
-			pkgID:   build.pkgID,
-			extract: build.extract.Types[index],
-			idByKey: build.idByKey,
+	for index := range extract.Types {
+		pkg.TypeIDs = append(pkg.TypeIDs, typeID)
+		facts.Types = append(facts.Types, typeFacts(&typeBuild{
+			id:      typeID,
+			pkgID:   pkgID,
+			extract: extract.Types[index],
+			idByKey: idByKey,
 		}))
-		build.typeID++
+		typeID++
 	}
 
-	return pkg, build.typeID
+	return pkg, typeID
 }
 
 func resolveKeys(keys []string, idByKey map[string]int) []int {

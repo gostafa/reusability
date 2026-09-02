@@ -10,9 +10,13 @@ import (
 type (
 	// PackageExtract is one package's raw extraction before ID assignment.
 	PackageExtract struct {
-		Path     string
-		Imports  []string
-		Types    []TypeExtract
+		// Path is the package import path.
+		Path string
+		// Imports lists import paths referenced by the package.
+		Imports []string
+		// Types holds named types extracted from the package.
+		Types []TypeExtract
+		// InModule reports whether the package belongs to the main module.
 		InModule bool
 	}
 

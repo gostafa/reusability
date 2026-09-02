@@ -253,45 +253,47 @@ func (s *extractWorkerState) worker() func(int) error {
 
 func extractPackage(pkg *packages.Package, opts *extractorOptions) domain.PackageExtract {
 	idx := indexSyntax(pkg)
+	ctx := newExtractCtx(pkg, opts, &idx)
 	out := domain.PackageExtract{
 		Path:     pkg.PkgPath,
 		InModule: inModule(pkg, opts.modulePath),
 		Imports:  importPaths(pkg),
 	}
-	collectTypeExtracts(&namedTypeCollect{
-		out: &out, pkg: pkg, opts: opts, idx: &idx, scope: pkg.Types.Scope(),
-	})
+	collectTypeExtracts(&out, ctx, pkg.Types.Scope())
 
 	return out
 }
 
-func collectTypeExtracts(collect *namedTypeCollect) {
-	names := collect.scope.Names()
-
-	for i := range names {
-		appendNamedType(collect, names[i])
+func newExtractCtx(pkg *packages.Package, opts *extractorOptions, idx *syntaxIndex) *extractCtx {
+	return &extractCtx{
+		pkg:              pkg,
+		idx:              idx,
+		analyzed:         opts.analyzed,
+		baseDir:          opts.baseDir,
+		includeGenerated: opts.generated == includeGeneratedFiles,
 	}
 }
 
-func appendNamedType(collect *namedTypeCollect, name string) {
-	typeName, named, ok := lookupNamedType(collect.scope, name)
+func collectTypeExtracts(out *domain.PackageExtract, ctx *extractCtx, scope *types.Scope) {
+	names := scope.Names()
+
+	for i := range names {
+		appendNamedType(out, ctx, scope, names[i])
+	}
+}
+
+func appendNamedType(out *domain.PackageExtract, ctx *extractCtx, scope *types.Scope, name string) {
+	typeName, named, ok := lookupNamedType(scope, name)
 
 	if !ok {
 		return
 	}
 
-	skipRequest := &skipPosRequest{
-		fset: collect.pkg.Fset, policy: collect.opts.generated,
-		generated: collect.idx.generated, pos: typeName.Pos(),
-	}
-
-	if skipPos(skipRequest) {
+	if skipCtxPos(ctx, typeName.Pos()) {
 		return
 	}
 
-	collect.out.Types = append(collect.out.Types, extractType(&extractTypeRequest{
-		pkg: collect.pkg, opts: collect.opts, idx: collect.idx, tn: typeName, named: named,
-	}))
+	out.Types = append(out.Types, extractType(ctx, typeName, named))
 }
 
 func lookupNamedType(scope *types.Scope, name string) (*types.TypeName, *types.Named, bool) {
@@ -310,51 +312,51 @@ func lookupNamedType(scope *types.Scope, name string) (*types.TypeName, *types.N
 	return typeName, named, true
 }
 
-func extractType(req *extractTypeRequest) domain.TypeExtract {
-	out := baseTypeExtract(req)
-	refs := newRefCollector(req.tn, req.opts.analyzed)
-	collected := structFields(req.named, refs)
+func extractType(ctx *extractCtx, tn *types.TypeName, named *types.Named) domain.TypeExtract {
+	out := baseTypeExtract(ctx, tn, named)
+	refs := newRefCollector(tn, ctx.analyzed)
+	collected := structFields(named, refs)
 	fields, fieldIndex, fieldPositions := collected.fields, collected.fieldIndex, collected.positions
 
 	out.Fields = fields
 
-	docMethods := fillTypeMethods(
-		&out,
-		&methodBuildRequest{req: req, refs: refs, fieldIndex: fieldIndex},
-	)
-	attachTypeRefsDocs(&typeRefsDocsRequest{
-		out: &out, req: req, refs: refs,
-		fieldPositions: fieldPositions, docMethods: docMethods,
-	})
+	docMethods := fillTypeMethods(&out, ctx, named, refs, fieldIndex)
+	attachTypeRefsDocs(&out, ctx, tn, refs, fieldPositions, docMethods)
 
 	return out
 }
 
-func attachTypeRefsDocs(args *typeRefsDocsRequest) {
-	args.out.ReferencedTypeKeys = sortedRefKeys(args.refs.seen)
-	args.out.ExportedMembers, args.out.DocumentedExportedMembers = memberDocs(&memberDocsRequest{
-		typeDocs:       args.req.idx.typeDocs,
-		fieldDocs:      args.req.idx.fieldDocs,
-		tn:             args.req.tn,
-		fields:         args.out.Fields,
-		fieldPositions: args.fieldPositions,
-		methods:        args.docMethods,
-	})
+func attachTypeRefsDocs(
+	out *domain.TypeExtract,
+	ctx *extractCtx,
+	tn *types.TypeName,
+	refs *refCollector,
+	fieldPositions []token.Pos,
+	docMethods []methodDocInput,
+) {
+	out.ReferencedTypeKeys = sortedRefKeys(refs.seen)
+	out.ExportedMembers, out.DocumentedExportedMembers = memberDocs(
+		ctx.idx, tn, out.Fields, fieldPositions, docMethods,
+	)
 }
 
-func baseTypeExtract(req *extractTypeRequest) domain.TypeExtract {
+func baseTypeExtract(ctx *extractCtx, tn *types.TypeName, named *types.Named) domain.TypeExtract {
 	return domain.TypeExtract{
-		Name:     req.tn.Name(),
-		Exported: req.tn.Exported(),
-		Kind:     typeKind(req.named),
-		Pos:      position(req.pkg.Fset, req.opts.baseDir, req.tn.Pos()),
+		Name:     tn.Name(),
+		Exported: tn.Exported(),
+		Kind:     typeKind(named),
+		Pos:      position(ctx.pkg.Fset, ctx.baseDir, tn.Pos()),
 	}
 }
 
-func fillTypeMethods(out *domain.TypeExtract, build *methodBuildRequest) []methodDocInput {
-	methods := sortedMethods(&sortedMethodsRequest{
-		fset: build.req.pkg.Fset, opts: build.req.opts, idx: build.req.idx, named: build.req.named,
-	})
+func fillTypeMethods(
+	out *domain.TypeExtract,
+	ctx *extractCtx,
+	named *types.Named,
+	refs *refCollector,
+	fieldIndex map[*types.Var]int,
+) []methodDocInput {
+	methods := sortedMethods(ctx, named)
 	methodIndex := indexMethodDecls(methods)
 
 	out.Methods = make([]domain.MethodFacts, zero, len(methods))
@@ -362,10 +364,7 @@ func fillTypeMethods(out *domain.TypeExtract, build *methodBuildRequest) []metho
 	docs := make([]methodDocInput, zero, len(methods))
 
 	for i := range methods {
-		facts, doc := methodFacts(&methodFactsRequest{
-			pkg: build.req.pkg, opts: build.req.opts, m: methods[i], refs: build.refs,
-			fieldCount: len(out.Fields), fieldIndex: build.fieldIndex, methodIndex: methodIndex,
-		})
+		facts, doc := methodFacts(ctx, methods[i], refs, fieldIndex, methodIndex, len(out.Fields))
 
 		out.Methods = append(out.Methods, facts)
 		docs = append(docs, doc)
@@ -535,9 +534,7 @@ func load(
 		return emptyString, nil, fmt.Errorf("goloader packages: %w", err)
 	}
 
-	modulePath, extracts, finishErr := extractLoaded(ctx, &loadedPackages{
-		opts: opts, deps: deps, pkgs: pkgs,
-	})
+	modulePath, extracts, finishErr := extractLoaded(ctx, opts, deps, pkgs)
 	if finishErr != nil {
 		return emptyString, nil, fmt.Errorf("goloader finish: %w", finishErr)
 	}
@@ -547,15 +544,17 @@ func load(
 
 func extractLoaded(
 	ctx context.Context,
-	loaded *loadedPackages,
+	opts *outbound.FactOptions,
+	deps *loaderDeps,
+	pkgs []*packages.Package,
 ) (string, []domain.PackageExtract, error) {
 	// extractLoaded.
-	modulePath := mainModulePath(loaded.pkgs)
+	modulePath := mainModulePath(pkgs)
 
 	extracts, err := extractAll(
 		ctx,
-		&extractJob{pkgs: loaded.pkgs, opts: loaded.opts, modulePath: modulePath},
-		loaded.deps,
+		&extractJob{pkgs: pkgs, opts: opts, modulePath: modulePath},
+		deps,
 	)
 	if err != nil {
 		return emptyString, nil, fmt.Errorf("goloader extract: %w", err)
@@ -695,39 +694,50 @@ func findAnyModulePath(pkgs []*packages.Package) string {
 	return emptyString
 }
 
-func memberDocs(req *memberDocsRequest) (exported, documented int) {
-	exported, documented = countTypeDocs(req)
-	exported, documented = addFieldDocs(req, exported, documented)
-	exported, documented = addMethodDocs(req.methods, exported, documented)
+func memberDocs(
+	idx *syntaxIndex,
+	tn *types.TypeName,
+	fields []domain.FieldFacts,
+	fieldPositions []token.Pos,
+	methods []methodDocInput,
+) (exported, documented int) {
+	exported, documented = countTypeDocs(idx.typeDocs, tn)
+	exported, documented = addFieldDocs(idx.fieldDocs, fields, fieldPositions, exported, documented)
+	exported, documented = addMethodDocs(methods, exported, documented)
 
 	return exported, documented
 }
 
-func countTypeDocs(req *memberDocsRequest) (exported, documented int) {
-	if !req.tn.Exported() {
+func countTypeDocs(typeDocs map[types.Object]bool, tn *types.TypeName) (exported, documented int) {
+	if !tn.Exported() {
 		return zero, zero
 	}
 
 	exported = one
 
-	if req.typeDocs[req.tn] {
+	if typeDocs[tn] {
 		documented = one
 	}
 
 	return exported, documented
 }
 
-func addFieldDocs(req *memberDocsRequest, exported, documented int) (exp, doc int) {
+func addFieldDocs(
+	fieldDocs []docRange,
+	fields []domain.FieldFacts,
+	fieldPositions []token.Pos,
+	exported, documented int,
+) (exp, doc int) {
 	exp, doc = exported, documented
 
-	for i := range req.fields {
-		if !req.fields[i].Exported {
+	for i := range fields {
+		if !fields[i].Exported {
 			continue
 		}
 
 		exp++
 
-		if fieldDocumented(req.fieldDocs, req.fieldPositions[i]) {
+		if fieldDocumented(fieldDocs, fieldPositions[i]) {
 			doc++
 		}
 	}
@@ -753,25 +763,32 @@ func addMethodDocs(methods []methodDocInput, exported, documented int) (exp, doc
 	return exp, doc
 }
 
-func methodFacts(req *methodFactsRequest) (domain.MethodFacts, methodDocInput) {
+func methodFacts(
+	ctx *extractCtx,
+	m methodDecl,
+	refs *refCollector,
+	fieldIndex map[*types.Var]int,
+	methodIndex map[*types.Func]int,
+	fieldCount int,
+) (domain.MethodFacts, methodDocInput) {
 	facts := domain.MethodFacts{
-		Name:     req.m.fn.Name(),
-		Exported: req.m.fn.Exported(),
-		Pos:      position(req.pkg.Fset, req.opts.baseDir, req.m.decl.Pos()),
-		Lines:    lineCount(req.pkg.Fset, req.m.decl.Pos(), req.m.decl.End()),
+		Name:     m.fn.Name(),
+		Exported: m.fn.Exported(),
+		Pos:      position(ctx.pkg.Fset, ctx.baseDir, m.decl.Pos()),
+		Lines:    lineCount(ctx.pkg.Fset, m.decl.Pos(), m.decl.End()),
 	}
 
-	if sig, ok := req.m.fn.Type().(*types.Signature); ok {
-		req.refs.addType(sig)
+	if sig, ok := m.fn.Type().(*types.Signature); ok {
+		refs.addType(sig)
 	}
 
 	walkBody(&walkBodyRequest{
-		info: req.pkg.TypesInfo, decl: req.m.decl, self: req.m.fn,
-		fieldCount: req.fieldCount, fieldIndex: req.fieldIndex,
-		methodIndex: req.methodIndex, facts: &facts,
+		info: ctx.pkg.TypesInfo, decl: m.decl, self: m.fn,
+		fieldCount: fieldCount, fieldIndex: fieldIndex,
+		methodIndex: methodIndex, facts: &facts,
 	})
 
-	return facts, methodDocInput{exported: req.m.fn.Exported(), documented: req.m.decl.Doc != nil}
+	return facts, methodDocInput{exported: m.fn.Exported(), documented: m.decl.Doc != nil}
 }
 
 func newRefCollector(self *types.TypeName, analyzed map[string]bool) *refCollector {
@@ -1037,6 +1054,19 @@ func truncateErrors(errs []string) (shown []string, suffix string) {
 	return errs[:maxShownErrors], fmt.Sprintf("\n… and %d more", len(errs)-maxShownErrors)
 }
 
+func skipCtxPos(ctx *extractCtx, pos token.Pos) bool {
+	policy := excludeGeneratedFiles
+
+	if ctx.includeGenerated {
+		policy = includeGeneratedFiles
+	}
+
+	return skipPos(&skipPosRequest{
+		fset: ctx.pkg.Fset, policy: policy,
+		generated: ctx.idx.generated, pos: pos,
+	})
+}
+
 func skipPos(req *skipPosRequest) bool {
 	if req.policy == includeGeneratedFiles {
 		return false
@@ -1045,8 +1075,8 @@ func skipPos(req *skipPosRequest) bool {
 	return req.generated[req.fset.Position(req.pos).Filename]
 }
 
-func sortedMethods(req *sortedMethodsRequest) []methodDecl {
-	methods := collectMethodDecls(req)
+func sortedMethods(ctx *extractCtx, named *types.Named) []methodDecl {
+	methods := collectMethodDecls(ctx, named)
 	slices.SortFunc(methods, func(a, b methodDecl) int {
 		return strings.Compare(a.fn.Name(), b.fn.Name())
 	})
@@ -1054,11 +1084,11 @@ func sortedMethods(req *sortedMethodsRequest) []methodDecl {
 	return methods
 }
 
-func collectMethodDecls(req *sortedMethodsRequest) []methodDecl {
-	methods := make([]methodDecl, zero, req.named.NumMethods())
+func collectMethodDecls(ctx *extractCtx, named *types.Named) []methodDecl {
+	methods := make([]methodDecl, zero, named.NumMethods())
 
-	for method := range req.named.Methods() {
-		methods = appendMethodDecl(methods, req, method)
+	for method := range named.Methods() {
+		methods = appendMethodDecl(methods, ctx, method)
 	}
 
 	return methods
@@ -1066,24 +1096,17 @@ func collectMethodDecls(req *sortedMethodsRequest) []methodDecl {
 
 func appendMethodDecl(
 	methods []methodDecl,
-	req *sortedMethodsRequest,
+	ctx *extractCtx,
 	method *types.Func,
 ) []methodDecl {
 	// appendMethodDecl.
-	decl, ok := req.idx.funcDecls[method]
+	decl, ok := ctx.idx.funcDecls[method]
 
-	if !ok || skipMethodDecl(req, decl) {
+	if !ok || skipCtxPos(ctx, decl.Pos()) {
 		return methods
 	}
 
 	return append(methods, methodDecl{fn: method, decl: decl})
-}
-
-func skipMethodDecl(req *sortedMethodsRequest, decl *ast.FuncDecl) bool {
-	return skipPos(&skipPosRequest{
-		fset: req.fset, policy: req.opts.generated,
-		generated: req.idx.generated, pos: decl.Pos(),
-	})
 }
 
 func sortedRefKeys(seen map[string]bool) []string {
@@ -1116,26 +1139,21 @@ func collectStructFields(structType *types.Struct, refs *refCollector) structFie
 	fields := make([]domain.FieldFacts, zero, structType.NumFields())
 	fieldIndex := make(map[*types.Var]int, structType.NumFields())
 	positions := make([]token.Pos, zero, structType.NumFields())
-	builder := &structFieldBuilder{
-		fields: &fields, fieldIndex: fieldIndex, fieldPositions: &positions, refs: refs,
-	}
 
 	for i := zero; i < structType.NumFields(); i++ {
-		appendStructField(builder, structType.Field(i), i)
+		field := structType.Field(i)
+
+		fieldIndex[field] = i
+		positions = append(positions, field.Pos())
+		fields = append(fields, domain.FieldFacts{
+			Name:     field.Name(),
+			Exported: field.Exported(),
+			Embedded: field.Anonymous(),
+		})
+		refs.addType(field.Type())
 	}
 
 	return structFieldsResult{fields: fields, fieldIndex: fieldIndex, positions: positions}
-}
-
-func appendStructField(builder *structFieldBuilder, field *types.Var, idx int) {
-	builder.fieldIndex[field] = idx
-	*builder.fieldPositions = append(*builder.fieldPositions, field.Pos())
-	*builder.fields = append(*builder.fields, domain.FieldFacts{
-		Name:     field.Name(),
-		Exported: field.Exported(),
-		Embedded: field.Anonymous(),
-	})
-	builder.refs.addType(field.Type())
 }
 
 func typeKind(named *types.Named) domain.TypeKind {

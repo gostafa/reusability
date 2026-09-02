@@ -4,9 +4,6 @@
 package application
 
 const (
-	needComplexity metricNeeds = 1 << 0
-	needCohesion   metricNeeds = 1 << 1
-
 	zero = 0
 
 	opAnalyze  = "Analyze"
@@ -14,4 +11,7 @@ const (
 	opNewCalc  = "newReusabilityCalculator"
 
 	errFmtOp = "%s: %w"
+
+	fieldUsageDirect     = "direct"
+	fieldUsageTransitive = "transitive"
 )

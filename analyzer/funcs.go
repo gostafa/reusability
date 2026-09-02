@@ -24,9 +24,9 @@ import (
 // New returns a go/analysis Analyzer that loads the module once, evaluates the
 // reusability policy, and emits diagnostics for the package under analysis.
 func New(settings *Settings) (*analysis.Analyzer, error) {
-	resolved := settings.withDefaults()
+	resolved := settingsWithDefaults(settings)
 
-	err := resolved.validate()
+	err := validateSettings(&resolved)
 	if err != nil {
 		return nil, fmt.Errorf("New: %w", err)
 	}
@@ -42,15 +42,19 @@ func New(settings *Settings) (*analysis.Analyzer, error) {
 	}, nil
 }
 
-// UnmarshalJSON accepts snake_case tags and remaps kebab-case keys from
+// UnmarshalSettings accepts snake_case tags and remaps kebab-case keys from
 // golangci-lint settings so DisallowUnknownFields still applies.
-func (settings *Settings) UnmarshalJSON(data []byte) error {
+func UnmarshalSettings(data []byte, settings *Settings) error {
+	return unmarshalSettings(settings, data)
+}
+
+func unmarshalSettings(settings *Settings, data []byte) error {
 	remapped, err := remapKebabKeys(data)
 	if err != nil {
 		return fmt.Errorf(errFmtUnmarshal, err)
 	}
 
-	err = settings.decodeSettings(remapped)
+	err = decodeSettings(settings, remapped)
 	if err != nil {
 		return fmt.Errorf(errFmtUnmarshal, err)
 	}
@@ -58,7 +62,7 @@ func (settings *Settings) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (settings *Settings) decodeSettings(data []byte) error {
+func decodeSettings(settings *Settings, data []byte) error {
 	type settingsAlias Settings
 
 	decoder := json.NewDecoder(bytes.NewReader(data))
@@ -76,7 +80,7 @@ func (settings *Settings) decodeSettings(data []byte) error {
 	return nil
 }
 
-func (settings *Settings) reusabilityWeights() metrics.ReusabilityWeights {
+func settingsReusabilityWeights(settings *Settings) metrics.ReusabilityWeights {
 	weights := metrics.DefaultReusabilityWeights()
 
 	if settings.ReusabilityWeights == nil {
@@ -109,14 +113,14 @@ func pickFloat(override *float64, fallback float64) float64 {
 	return *override
 }
 
-// rules returns the inline policy rules. With no rules configured, the
+// settingsRules returns the inline policy rules. With no rules configured, the
 // recommended defaults apply.
-func (settings *Settings) rules() ([]policydomain.Rule, error) {
+func settingsRules(settings *Settings) ([]policydomain.Rule, error) {
 	if len(settings.Rules) == zero {
 		return policydomain.DefaultRules(), nil
 	}
 
-	parsed, err := settings.parseRules()
+	parsed, err := parseSettingsRules(settings)
 	if err != nil {
 		return nil, fmt.Errorf("rules: %w", err)
 	}
@@ -124,7 +128,7 @@ func (settings *Settings) rules() ([]policydomain.Rule, error) {
 	return parsed, nil
 }
 
-func (settings *Settings) parseRules() ([]policydomain.Rule, error) {
+func parseSettingsRules(settings *Settings) ([]policydomain.Rule, error) {
 	rules := make([]policydomain.Rule, zero, len(settings.Rules))
 
 	for index := range settings.Rules {
@@ -146,7 +150,7 @@ func (settings *Settings) parseRules() ([]policydomain.Rule, error) {
 	return rules, nil
 }
 
-func (settings *Settings) toConfig() reusability.Config {
+func settingsToConfig(settings *Settings) reusability.Config {
 	return reusability.Config{
 		Directory:          settings.Directory,
 		Patterns:           append([]string(nil), settings.Patterns...),
@@ -157,17 +161,17 @@ func (settings *Settings) toConfig() reusability.Config {
 		DependencyScope:    reusability.DependencyScope(settings.DependencyScope),
 		FieldUsageMode:     reusability.FieldUsageMode(settings.FieldUsage),
 		ContinueOnError:    settings.ContinueOnError,
-		ReusabilityWeights: settings.reusabilityWeights(),
+		ReusabilityWeights: settingsReusabilityWeights(settings),
 	}
 }
 
-func (settings *Settings) validate() error {
-	err := settings.validateModes()
+func validateSettings(settings *Settings) error {
+	err := validateSettingsModes(settings)
 	if err != nil {
 		return fmt.Errorf(errFmtValidate, err)
 	}
 
-	err = settings.validateWeightsAndRules()
+	err = validateSettingsWeightsAndRules(settings)
 	if err != nil {
 		return fmt.Errorf(errFmtValidate, err)
 	}
@@ -175,7 +179,7 @@ func (settings *Settings) validate() error {
 	return nil
 }
 
-func (settings *Settings) validateModes() error {
+func validateSettingsModes(settings *Settings) error {
 	err := validateDependencyScope(settings.DependencyScope)
 	if err != nil {
 		return fmt.Errorf(errFmtValidate, err)
@@ -189,15 +193,15 @@ func (settings *Settings) validateModes() error {
 	return nil
 }
 
-func (settings *Settings) validateWeightsAndRules() error {
-	weights := settings.reusabilityWeights()
+func validateSettingsWeightsAndRules(settings *Settings) error {
+	weights := settingsReusabilityWeights(settings)
 
 	err := weights.Validate()
 	if err != nil {
 		return fmt.Errorf(errFmtValidate, err)
 	}
 
-	rules, err := settings.rules()
+	rules, err := settingsRules(settings)
 	if err != nil {
 		return fmt.Errorf(errFmtValidate, err)
 	}
@@ -209,7 +213,7 @@ func (settings *Settings) validateWeightsAndRules() error {
 	return nil
 }
 
-func (settings *Settings) withDefaults() Settings {
+func settingsWithDefaults(settings *Settings) Settings {
 	out := *settings
 
 	if len(out.Patterns) == zero {
@@ -243,12 +247,12 @@ func computeViolations(
 	analyzer reportAnalyzer,
 ) (map[string][]policydomain.Violation, error) {
 	// Load rules, run analysis once, then group violations by package path.
-	rules, err := settings.rules()
+	rules, err := settingsRules(settings)
 	if err != nil {
 		return nil, fmt.Errorf("reusability policy: %w", err)
 	}
 
-	cfg := settings.toConfig()
+	cfg := settingsToConfig(settings)
 
 	report, err := analyzer.Analyze(context.Background(), &cfg)
 	if err != nil {

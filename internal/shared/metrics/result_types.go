@@ -6,11 +6,17 @@ package metrics
 type (
 	// MetricResult is one computed metric value with applicability metadata.
 	MetricResult struct {
-		Name       string
-		Scope      MetricScope
-		Reason     string
+		// Name is the metric identifier (for example "reusability").
+		Name string
+		// Scope is whether the metric is type- or package-level.
+		Scope MetricScope
+		// Reason explains drops or non-applicability when set.
+		Reason string
+		// Definition identifies the formula version used.
 		Definition string
-		Value      float64
+		// Value is the numeric score when Applicable is true.
+		Value float64
+		// Applicable is false when the metric cannot be computed.
 		Applicable bool
 	}
 
@@ -24,18 +30,27 @@ type (
 
 	// ReusabilityComponent is one weighted input to the reusability index.
 	ReusabilityComponent struct {
-		Name       string
-		Reason     string
-		Value      float64
+		// Name identifies the component (cohesion, coupling, …).
+		Name string
+		// Reason explains why the component was dropped when not applicable.
+		Reason string
+		// Value is the component score in [0, 1] when Applicable is true.
+		Value float64
+		// Applicable is false when the component must be dropped.
 		Applicable bool
 	}
 
 	// ReusabilityInput bundles the four components and their weights.
 	ReusabilityInput struct {
-		Cohesion      ReusabilityComponent
-		Coupling      ReusabilityComponent
-		Testability   ReusabilityComponent
+		// Cohesion is the cohesion component derived from LCOM.
+		Cohesion ReusabilityComponent
+		// Coupling is the coupling component derived from CBO.
+		Coupling ReusabilityComponent
+		// Testability is the testability component derived from AMC.
+		Testability ReusabilityComponent
+		// Documentation is the documentation-coverage component.
 		Documentation ReusabilityComponent
-		Weights       ReusabilityWeights
+		// Weights are the four component weights before renormalization.
+		Weights ReusabilityWeights
 	}
 )

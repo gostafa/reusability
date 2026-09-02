@@ -19,9 +19,7 @@ func BuildDependencyGraph(facts *typefacts.ProjectFacts, scope Scope) Dependency
 	graph := DependencyGraph{Couplings: make([]Coupling, len(facts.Packages))}
 
 	for index := range facts.Packages {
-		addPackageEdges(&edgeJob{
-			graph: &graph, facts: facts, pkgID: index, scope: scope, analyzed: analyzed,
-		})
+		addPackageEdges(&graph, facts, analyzed, scope, index)
 	}
 
 	return graph
@@ -47,32 +45,52 @@ func (graph DependencyGraph) Coupling(packageID int) Coupling {
 	return graph.Couplings[packageID]
 }
 
-func addPackageEdges(job *edgeJob) {
-	imports := job.facts.Packages[job.pkgID].Imports
+func addPackageEdges(
+	graph *DependencyGraph,
+	facts *typefacts.ProjectFacts,
+	analyzed map[string]int,
+	scope Scope,
+	pkgID int,
+) {
+	imports := facts.Packages[pkgID].Imports
 
 	for index := range imports {
-		recordEdge(job, imports[index])
+		recordEdge(graph, facts, analyzed, scope, pkgID, imports[index])
 	}
 }
 
-func recordEdge(job *edgeJob, path string) {
-	recordAfferent(job, path)
-	recordEfferent(job, path)
+func recordEdge(
+	graph *DependencyGraph,
+	facts *typefacts.ProjectFacts,
+	analyzed map[string]int,
+	scope Scope,
+	pkgID int,
+	path string,
+) {
+	recordAfferent(graph, analyzed, path)
+	recordEfferent(graph, facts, analyzed, scope, pkgID, path)
 }
 
-func recordAfferent(job *edgeJob, path string) {
-	if target, ok := job.analyzed[path]; ok {
-		job.graph.Couplings[target].Afferent++
+func recordAfferent(graph *DependencyGraph, analyzed map[string]int, path string) {
+	if target, ok := analyzed[path]; ok {
+		graph.Couplings[target].Afferent++
 	}
 }
 
-func recordEfferent(job *edgeJob, path string) {
+func recordEfferent(
+	graph *DependencyGraph,
+	facts *typefacts.ProjectFacts,
+	analyzed map[string]int,
+	scope Scope,
+	pkgID int,
+	path string,
+) {
 	check := &scopeCheck{
-		path: path, scope: job.scope, modulePath: job.facts.ModulePath, analyzed: job.analyzed,
+		path: path, scope: scope, modulePath: facts.ModulePath, analyzed: analyzed,
 	}
 
 	if inScope(check) {
-		job.graph.Couplings[job.pkgID].Efferent++
+		graph.Couplings[pkgID].Efferent++
 	}
 }
 

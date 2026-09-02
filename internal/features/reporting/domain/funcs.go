@@ -153,7 +153,7 @@ func writeTextTableBody(
 		return fmt.Errorf("write rows: %w", err)
 	}
 
-	err = writeTextFooter(builder, &footerArgs{sawNA: sawNA, report: report, opts: opts})
+	err = writeTextFooter(builder, report, opts, sawNA)
 	if err != nil {
 		return fmt.Errorf("write footer: %w", err)
 	}
@@ -231,7 +231,7 @@ func textHeaderRow(typeCols []string) []tableCell {
 
 func emitTreeRows(table *textTable, root *treeNode, summaries map[*treeNode]*treeSummary) {
 	if root.pkg != nil {
-		table.emitModuleSummary(root, summaries[root])
+		emitModuleSummary(table, root, summaries[root])
 	}
 
 	for i := range root.children {
@@ -239,22 +239,22 @@ func emitTreeRows(table *textTable, root *treeNode, summaries map[*treeNode]*tre
 			table.rows = append(table.rows, nil)
 		}
 
-		table.emitNode(&emitArgs{
-			node:      root.children[i],
-			summaries: summaries,
-			prefix:    emptyString,
-			connector: emptyString,
-		})
+		emitNode(table, root.children[i], summaries, emptyString, emptyString)
 	}
 }
 
-func writeTextFooter(builder *strings.Builder, args *footerArgs) error {
-	err := writeNALegend(builder, args)
+func writeTextFooter(
+	builder *strings.Builder,
+	report *reusability.Report,
+	opts TextOptions,
+	sawNA bool,
+) error {
+	err := writeNALegend(builder, opts.Color, sawNA)
 	if err != nil {
 		return fmt.Errorf("write na legend: %w", err)
 	}
 
-	err = writeExplainNotes(builder, args)
+	err = writeExplainNotes(builder, report, opts)
 	if err != nil {
 		return fmt.Errorf("write explain notes: %w", err)
 	}
@@ -262,8 +262,8 @@ func writeTextFooter(builder *strings.Builder, args *footerArgs) error {
 	return nil
 }
 
-func writeNALegend(builder *strings.Builder, args *footerArgs) error {
-	if !args.sawNA {
+func writeNALegend(builder *strings.Builder, color bool, sawNA bool) error {
+	if !sawNA {
 		return nil
 	}
 
@@ -271,7 +271,7 @@ func writeNALegend(builder *strings.Builder, args *footerArgs) error {
 		builder,
 		newline,
 		paint(&paintArgs{
-			text: naCell + " = not applicable", style: ansiDim, color: args.opts.Color,
+			text: naCell + " = not applicable", style: ansiDim, color: color,
 		}),
 		newline,
 	)
@@ -282,12 +282,16 @@ func writeNALegend(builder *strings.Builder, args *footerArgs) error {
 	return nil
 }
 
-func writeExplainNotes(builder *strings.Builder, args *footerArgs) error {
-	if !args.opts.Explain {
+func writeExplainNotes(
+	builder *strings.Builder,
+	report *reusability.Report,
+	opts TextOptions,
+) error {
+	if !opts.Explain {
 		return nil
 	}
 
-	err := writeNotes(builder, args.report, args.opts.Color)
+	err := writeNotes(builder, report, opts.Color)
 	if err != nil {
 		return fmt.Errorf("write notes: %w", err)
 	}
@@ -436,7 +440,7 @@ func writeRowCell(args *rowWriteArgs, idx, last int) error {
 		return fmt.Errorf("write cell: %w", err)
 	}
 
-	err = writeCellPad(&cellPadArgs{row: args, cell: cell, idx: idx, last: last})
+	err = writeCellPad(args, cell, idx, last)
 	if err != nil {
 		return fmt.Errorf("write cell pad: %w", err)
 	}
@@ -444,14 +448,14 @@ func writeRowCell(args *rowWriteArgs, idx, last int) error {
 	return nil
 }
 
-func writeCellPad(args *cellPadArgs) error {
-	if args.idx >= args.last {
+func writeCellPad(args *rowWriteArgs, cell *tableCell, idx, last int) error {
+	if idx >= last {
 		return nil
 	}
 
-	pad := strings.Repeat(spaceString, args.row.widths[args.idx]-args.cell.width()+countTwo)
+	pad := strings.Repeat(spaceString, args.widths[idx]-cell.width()+countTwo)
 
-	err := writeBuilderString(args.row.builder, pad)
+	err := writeBuilderString(args.builder, pad)
 	if err != nil {
 		return fmt.Errorf("write pad: %w", err)
 	}
@@ -840,56 +844,65 @@ func (cell *tableCell) width() int {
 	return utf8.RuneCountInString(cell.prefix) + utf8.RuneCountInString(cell.text)
 }
 
-func (table *textTable) emitModuleSummary(node *treeNode, summary *treeSummary) {
-	table.nodeRow(node, summary, emptyString)
+func emitModuleSummary(table *textTable, node *treeNode, summary *treeSummary) {
+	nodeRow(table, node, summary, emptyString)
 
 	typeCount := nodeTypeCount(node, table.typeCols)
 
 	for i := range typeCount {
-		table.typeRow(&typeRowArgs{
-			node: node, summary: summary, index: i,
-			prefix: emptyString, connector: branchGlyph(i, typeCount),
-		})
+		typeRow(
+			table, node, summary, i, emptyString, branchGlyph(i, typeCount),
+		)
 	}
 }
 
-func (table *textTable) emitNode(args *emitArgs) {
-	table.nodeRow(args.node, args.summaries[args.node], args.prefix+args.connector)
+func emitNode(
+	table *textTable,
+	node *treeNode,
+	summaries map[*treeNode]*treeSummary,
+	prefix, connector string,
+) {
+	nodeRow(table, node, summaries[node], prefix+connector)
 
-	childPrefix := childIndent(args.prefix, args.connector)
-	typeCount := nodeTypeCount(args.node, table.typeCols)
-	total := typeCount + len(args.node.children)
-	branchArgs := &branchEmitArgs{
-		node: args.node, summary: args.summaries[args.node], summaries: args.summaries,
-		childPrefix: childPrefix, typeCount: typeCount, total: total,
-	}
-	table.emitTypeBranches(branchArgs)
-	table.emitChildNodes(branchArgs)
+	childPrefix := childIndent(prefix, connector)
+	typeCount := nodeTypeCount(node, table.typeCols)
+	total := typeCount + len(node.children)
+	emitTypeBranches(table, node, summaries[node], childPrefix, typeCount, total)
+	emitChildNodes(table, node, summaries, childPrefix, typeCount, total)
 }
 
-func (table *textTable) emitTypeBranches(args *branchEmitArgs) {
-	for i := range args.typeCount {
-		table.typeRow(&typeRowArgs{
-			node: args.node, summary: args.summary, index: i,
-			prefix: args.childPrefix, connector: branchGlyph(i, args.total),
-		})
+func emitTypeBranches(
+	table *textTable,
+	node *treeNode,
+	summary *treeSummary,
+	childPrefix string,
+	typeCount, total int,
+) {
+	for i := range typeCount {
+		typeRow(table, node, summary, i, childPrefix, branchGlyph(i, total))
 	}
 }
 
-func (table *textTable) emitChildNodes(args *branchEmitArgs) {
-	for i := range args.node.children {
-		if args.typeCount+i > indexZero {
-			table.rows = append(table.rows, []tableCell{{prefix: args.childPrefix + "│"}})
+func emitChildNodes(
+	table *textTable,
+	node *treeNode,
+	summaries map[*treeNode]*treeSummary,
+	childPrefix string,
+	typeCount, total int,
+) {
+	for i := range node.children {
+		if typeCount+i > indexZero {
+			table.rows = append(table.rows, []tableCell{{prefix: childPrefix + "│"}})
 		}
 
-		table.emitNode(&emitArgs{
-			node: args.node.children[i], summaries: args.summaries,
-			prefix: args.childPrefix, connector: branchGlyph(args.typeCount+i, args.total),
-		})
+		emitNode(
+			table, node.children[i], summaries,
+			childPrefix, branchGlyph(typeCount+i, total),
+		)
 	}
 }
 
-func (table *textTable) nodeRow(node *treeNode, summary *treeSummary, label string) {
+func nodeRow(table *textTable, node *treeNode, summary *treeSummary, label string) {
 	row := make([]tableCell, indexZero, len(table.typeCols)+1)
 
 	row = append(row, tableCell{prefix: label, text: node.name, style: ansiBold})
@@ -897,12 +910,18 @@ func (table *textTable) nodeRow(node *treeNode, summary *treeSummary, label stri
 	table.rows = append(table.rows, row)
 }
 
-func (table *textTable) typeRow(args *typeRowArgs) {
-	typ := &args.node.pkg.Types[args.index]
+func typeRow(
+	table *textTable,
+	node *treeNode,
+	summary *treeSummary,
+	index int,
+	prefix, connector string,
+) {
+	typ := &node.pkg.Types[index]
 	row := make([]tableCell, indexZero, len(table.typeCols)+1)
 
-	row = append(row, tableCell{prefix: args.prefix + args.connector, text: typ.Name})
-	row = append(row, reusabilityCell(&typ.Reusability, table.typeCols, args.summary.typeAgg)...)
+	row = append(row, tableCell{prefix: prefix + connector, text: typ.Name})
+	row = append(row, reusabilityCell(&typ.Reusability, table.typeCols, summary.typeAgg)...)
 	table.rows = append(table.rows, row)
 }
 
