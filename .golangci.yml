@@ -2,7 +2,13 @@
 version: '2'
 linters:
   default: all
-  disable: [wsl, gomodguard, nonamedreturns, testpackage, godot, exhaustruct]
+  disable:
+    - wsl
+    - gomodguard
+    - nonamedreturns
+    - testpackage
+    - godot
+    - exhaustruct
   enable: [reusability]
   settings:
     custom:
@@ -666,8 +672,7 @@ linters:
         - cuddle-group
       disable: []
   exclusions:
-    paths:
-      - .*_test.go
+    paths: [.*_test.go]
     generated: disable
     warn-unused: true
 issues:

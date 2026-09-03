@@ -14,8 +14,8 @@ linters:
           dependency-scope: module
           field-usage: direct
           rules:
-            - pattern: "**"
+            - pattern: '**'
               min: 0.60
             # A more-specific package path overrides the baseline.
-            - pattern: "github.com/example/project/internal/dto"
+            - pattern: github.com/example/project/internal/dto
               min: 0.50
