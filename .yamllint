@@ -1,15 +1,7 @@
 ---
 extends: default
 
-ignore: |
-  taskfiles/**
-  .taskotter/**
-  node_modules/**
-  **/node_modules/**
-  # Wails-generated build scaffolding (Taskfiles + platform bundles), like taskfiles/**.
-  cmd/activity-tracker/build/**
-  # Stray pre-merge copy of the UI project (now lives under cmd/activity-tracker).
-  activity-tracker/**
+ignore: taskotter/**
 
 rules:
   comments:
