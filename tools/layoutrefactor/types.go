@@ -9,27 +9,27 @@ import (
 )
 
 type (
-	declKind int
+	declKind = int
 
 	pkgDecl = struct {
 		decl ast.Decl
 		kind declKind
 	}
 
-	packageInfo struct {
+	packageInfo = struct {
 		ImportPath string
 		Dir        string
 		Name       string
 	}
 
-	writeOp struct {
+	writeOp = struct {
 		name    string
 		content []byte
 	}
 
-	constConflictAction int
+	constConflictAction = int
 
-	declFileInput struct {
+	declFileInput = struct {
 		fset       *token.FileSet
 		license    string
 		pkgName    string
@@ -101,34 +101,34 @@ type (
 		decls []pkgDecl
 	}
 
-	replaceInput struct {
+	replaceInput = struct {
 		old         ast.Node
 		replacement ast.Node
 		replaced    *bool
 	}
 
-	formatInput struct {
+	formatInput = struct {
 		fset    *token.FileSet
 		license string
 		file    *ast.File
 		label   string
 	}
 
-	mergeFileImportsInput struct {
+	mergeFileImportsInput = struct {
 		byPath map[string]*ast.ImportSpec
 		fset   *token.FileSet
 		dir    string
 		name   string
 	}
 
-	filterImportInput struct {
+	filterImportInput = struct {
 		imp        *ast.ImportSpec
 		importPath string
 		aliases    []string
 		kept       []*ast.ImportSpec
 	}
 
-	testFileMode int
+	testFileMode = int
 
 	constConflictInput = struct {
 		valueSpec *ast.ValueSpec
@@ -139,13 +139,13 @@ type (
 		kept      []ast.Spec
 	}
 
-	genDeclBuckets struct {
+	genDeclBuckets = struct {
 		constSpecs []ast.Spec
 		typeSpecs  []ast.Spec
 		varSpecs   []ast.Spec
 	}
 
-	runOptions struct {
+	runOptions = struct {
 		pattern string
 		dryRun  bool
 	}
@@ -157,19 +157,19 @@ type (
 		opts    runOptions
 	}
 
-	docSectionsInput struct {
+	docSectionsInput = struct {
 		license string
 		pkgName string
 		doc     string
 	}
 
-	prodParseInput struct {
+	prodParseInput = struct {
 		fset *token.FileSet
 		dir  string
 		prod []string
 	}
 
-	prodFileInput struct {
+	prodFileInput = struct {
 		fset       *token.FileSet
 		dir        string
 		name       string
@@ -182,7 +182,7 @@ type (
 		decls []ast.Decl
 	}
 
-	filterImportsInput struct {
+	filterImportsInput = struct {
 		importPath string
 		imports    []*ast.ImportSpec
 	}

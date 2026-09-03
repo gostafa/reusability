@@ -3,11 +3,6 @@
 
 package domain
 
-type (
-	// FieldUsageMode selects whether field usage is direct or call-transitive.
-	FieldUsageMode string
-)
-
 const (
 	// FieldUsageDirect counts only fields a method body accesses directly.
 	FieldUsageDirect FieldUsageMode = "direct"

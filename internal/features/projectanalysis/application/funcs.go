@@ -17,34 +17,19 @@ import (
 )
 
 // NewPipeline returns a pipeline backed by the given fact collector.
-func NewPipeline(facts typefacts.Collector) *Pipeline {
+func NewPipeline(facts typefacts.Service) Pipeline {
 	return pipelineWithWorkers(facts, workerpool.Run)
 }
 
 func pipelineWithWorkers(
-	facts typefacts.Collector,
+	facts typefacts.Service,
 	runWorkers func(context.Context, workerpool.RunConfig) error,
-) *Pipeline {
-	return &Pipeline{
-		analyze: func(ctx context.Context, opts *inbound.Options) (inbound.Result, error) {
-			return runPipeline(ctx, &pipelineInput{
-				facts: facts, opts: opts, runWorkers: runWorkers,
-			})
-		},
+) Pipeline {
+	return func(ctx context.Context, opts *inbound.Options) (inbound.Result, error) {
+		return runPipeline(ctx, &pipelineInput{
+			facts: facts, opts: opts, runWorkers: runWorkers,
+		})
 	}
-}
-
-// Analyze runs the full pipeline for one request.
-func (pipeline *Pipeline) Analyze(
-	ctx context.Context,
-	opts *inbound.Options,
-) (inbound.Result, error) {
-	result, err := pipeline.analyze(ctx, opts)
-	if err != nil {
-		return inbound.Result{}, fmt.Errorf("pipeline analyze: %w", err)
-	}
-
-	return result, nil
 }
 
 func runPipeline(ctx context.Context, input *pipelineInput) (inbound.Result, error) {
@@ -66,7 +51,7 @@ func runPipeline(ctx context.Context, input *pipelineInput) (inbound.Result, err
 func runPreparedPipeline(
 	ctx context.Context,
 	input *pipelineInput,
-	calculator *reusability.Service,
+	calculator reusability.Service,
 ) (inbound.Result, error) {
 	projectFacts, err := loadFacts(ctx, input.facts, input.opts)
 	if err != nil {
@@ -85,12 +70,12 @@ func runPreparedPipeline(
 
 func loadFacts(
 	ctx context.Context,
-	collector typefacts.Collector,
+	collector typefacts.Service,
 	opts *inbound.Options,
 ) (*tfdomain.ProjectFacts, error) {
 	fo := collectOptions(opts)
 
-	facts, err := collector.Collect(ctx, &fo)
+	facts, err := collector(ctx, &fo)
 	if err != nil {
 		return nil, fmt.Errorf(errFmtOp, opAnalyze, err)
 	}
@@ -115,7 +100,7 @@ func analyzePackage(input *packageAnalysisInput) inbound.PackageResult {
 
 func analyzeType(
 	typeFacts *tfdomain.TypeFacts,
-	calculator *reusability.Service,
+	calculator reusability.Service,
 	opts *inbound.Options,
 ) inbound.TypeResult {
 	return inbound.TypeResult{
@@ -194,7 +179,7 @@ func nameSet(names []string) map[string]bool {
 func newReusabilityCalculator(
 	compute map[string]bool,
 	weights *metrics.ReusabilityWeights,
-) (*reusability.Service, error) {
+) (reusability.Service, error) {
 	resolved := weights
 
 	if !compute[metrics.MetricReusability] && !compute[metrics.MetricCBO] {
@@ -227,7 +212,7 @@ func packageWorkerConfig(input *workerConfigInput) workerpool.RunConfig {
 }
 
 func typeReusability(
-	calculator *reusability.Service,
+	calculator reusability.Service,
 	typeFacts *tfdomain.TypeFacts,
 	fieldUsage string,
 ) metrics.MetricResult {
@@ -235,5 +220,5 @@ func typeReusability(
 		return metrics.MetricResult{}
 	}
 
-	return calculator.ComputeForType(typeFacts, fieldUsage).Reusability
+	return calculator(typeFacts, fieldUsage).Reusability
 }

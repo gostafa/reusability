@@ -4,8 +4,18 @@
 package domain
 
 type (
+	// PackagePathView exposes one package's import path.
+	PackagePathView interface {
+		ImportPath() string
+	}
+
+	// FactDumper renders a compact debug representation.
+	FactDumper interface {
+		String() string
+	}
+
 	// ProjectFacts is the assembled, ID-assigned fact set for a module.
-	ProjectFacts struct {
+	ProjectFacts = struct {
 		// ModulePath is the import path of the main module, when known.
 		ModulePath string
 		// Packages is sorted by import path; a package's ID is its index.
@@ -15,7 +25,7 @@ type (
 	}
 
 	// PackageFacts is one analyzed package after ID assignment.
-	PackageFacts struct {
+	PackageFacts = struct {
 		Path     string
 		Imports  []string
 		TypeIDs  []int

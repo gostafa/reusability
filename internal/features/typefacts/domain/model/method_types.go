@@ -34,7 +34,7 @@ type (
 	}
 
 	// BranchStats counts control-flow constructs that raise cyclomatic complexity.
-	BranchStats struct {
+	BranchStats = struct {
 		Ifs         int // if statements
 		Fors        int // for loops (all, including conditionless "for {}")
 		Ranges      int // range loops

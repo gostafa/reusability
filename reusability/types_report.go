@@ -12,7 +12,7 @@ type (
 	MetricResult = metrics.MetricResult
 
 	// ToolInfo records the tool name and version that produced a report.
-	ToolInfo struct {
+	ToolInfo = struct {
 		// Name is the tool name embedded in reports; equals ToolName for this build.
 		Name string
 		// Version is the tool version string at analysis time.
@@ -34,7 +34,7 @@ type (
 	}
 
 	// PackageReport is one package's contribution to a Report.
-	PackageReport struct {
+	PackageReport = struct {
 		// Path is the package's import path.
 		Path string
 		// Types holds the package's analyzed named types, sorted by name.
@@ -42,7 +42,7 @@ type (
 	}
 
 	// TypeReport is one named type's contribution to a PackageReport.
-	TypeReport struct {
+	TypeReport = struct {
 		// Name is the type's identifier within its package.
 		Name string
 		// Reusability is the type-level reusability index and its applicability

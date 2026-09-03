@@ -163,8 +163,8 @@ func settingsToConfig(settings *Settings) reusability.Config {
 		IncludeGenerated:   settings.Generated,
 		BuildTags:          append([]string(nil), settings.BuildTags...),
 		Workers:            settings.Workers,
-		DependencyScope:    reusability.DependencyScope(settings.DependencyScope),
-		FieldUsageMode:     reusability.FieldUsageMode(settings.FieldUsage),
+		DependencyScope:    settings.DependencyScope,
+		FieldUsageMode:     settings.FieldUsage,
 		ContinueOnError:    settings.ContinueOnError,
 		ReusabilityWeights: settingsReusabilityWeights(settings),
 	}
@@ -225,8 +225,8 @@ func settingsWithDefaults(settings *Settings) Settings {
 		out.Patterns = []string{defaultPackagePattern}
 	}
 
-	out.DependencyScope = cmp.Or(out.DependencyScope, string(reusability.DependencyScopeModule))
-	out.FieldUsage = cmp.Or(out.FieldUsage, string(reusability.FieldUsageDirect))
+	out.DependencyScope = cmp.Or(out.DependencyScope, reusability.DependencyScopeModule)
+	out.FieldUsage = cmp.Or(out.FieldUsage, reusability.FieldUsageDirect)
 
 	return out
 }
@@ -411,7 +411,7 @@ func typePos(pass *analysis.Pass, name string) token.Pos {
 }
 
 func validateDependencyScope(value string) error {
-	switch reusability.DependencyScope(value) {
+	switch value {
 	case reusability.DependencyScopeProject,
 		reusability.DependencyScopeModule,
 		reusability.DependencyScopeAll:
@@ -422,7 +422,7 @@ func validateDependencyScope(value string) error {
 }
 
 func validateFieldUsage(value string) error {
-	switch reusability.FieldUsageMode(value) {
+	switch value {
 	case reusability.FieldUsageDirect, reusability.FieldUsageTransitive:
 		return nil
 	default:

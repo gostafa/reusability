@@ -16,18 +16,18 @@ import (
 	"github.com/gostafa/reusability/reusability"
 )
 
-func TestRuleListErrorsAndString(t *testing.T) {
-	var rules ruleList
-	if err := rules.Set(" **/internal/** : 0.7 "); err != nil {
+func TestRuleParsing(t *testing.T) {
+	var rules []ruleSpec
+	if err := appendRule(&rules, " **/internal/** : 0.7 "); err != nil {
 		t.Fatal(err)
 	}
-	if got := rules.String(); got != "**/internal/**:0.7" {
-		t.Fatalf("String() = %q", got)
+	if len(rules) != 1 || rules[0] != (ruleSpec{pattern: "**/internal/**", minimum: 0.7}) {
+		t.Fatalf("parsed rules = %+v", rules)
 	}
 
 	for _, value := range []string{"pattern", ":0.7", "pattern=0.7", "pattern:not-a-number"} {
-		if err := rules.Set(value); err == nil {
-			t.Errorf("Set(%q) succeeded, want error", value)
+		if err := appendRule(&rules, value); err == nil {
+			t.Errorf("appendRule(%q) succeeded, want error", value)
 		}
 	}
 }
@@ -40,11 +40,11 @@ func TestResolvePolicyRequiresRules(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, err := resolvePolicy(ruleList{}); err == nil {
+	if _, _, err := resolvePolicy(nil); err == nil {
 		t.Fatal("empty flag policy succeeded")
 	}
 
-	rules := ruleList{items: []ruleSpec{{pattern: "**/internal/**", minimum: 0.8}}}
+	rules := []ruleSpec{{pattern: "**/internal/**", minimum: 0.8}}
 	got, source, err := resolvePolicy(rules)
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +53,7 @@ func TestResolvePolicyRequiresRules(t *testing.T) {
 		t.Fatalf("flag rules = %+v, source = %q", got, source)
 	}
 
-	bad := ruleList{items: []ruleSpec{{pattern: "**", minimum: 2}}}
+	bad := []ruleSpec{{pattern: "**", minimum: 2}}
 	if _, _, err := resolvePolicy(bad); err == nil {
 		t.Fatal("invalid rule min succeeded")
 	}
@@ -186,10 +186,10 @@ func TestRunPolicySourceLogged(t *testing.T) {
 }
 
 func TestResolvePolicyValidatesRules(t *testing.T) {
-	specs, _, err := resolvePolicy(ruleList{items: []ruleSpec{
+	specs, _, err := resolvePolicy([]ruleSpec{
 		{pattern: "**/internal/**", minimum: 0.8},
 		{pattern: "**", minimum: 0.6},
-	}})
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

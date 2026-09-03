@@ -35,5 +35,5 @@ type (
 	}
 
 	// MetricScope classifies whether a metric is type- or package-level.
-	MetricScope string
+	MetricScope = string
 )

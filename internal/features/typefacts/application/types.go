@@ -26,13 +26,8 @@ type (
 		pkgID   int
 	}
 
-	// Collector loads and assembles project type facts.
-	Collector interface {
-		Collect(ctx context.Context, opts *outbound.FactOptions) (domain.ProjectFacts, error)
-	}
-
 	// Service is the application service backed by a FactSource.
-	Service struct {
-		source outbound.FactSource
-	}
+	Service = func(context.Context, *outbound.FactOptions) (domain.ProjectFacts, error)
+
+	factSourceFunc = func(context.Context, *outbound.FactOptions) (string, []domain.PackageExtract, error)
 )

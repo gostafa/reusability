@@ -26,13 +26,19 @@ func TestStringers(t *testing.T) {
 		Packages:   make([]PackageFacts, 2),
 		Types:      make([]TypeFacts, 3),
 	}
-	if s := pf.String(); !strings.Contains(s, "2 packages") || !strings.Contains(s, "3 types") {
-		t.Errorf("ProjectFacts.String = %q", s)
+	if s := projectFactsString(
+		pf,
+	); !strings.Contains(s, "2 packages") ||
+		!strings.Contains(s, "3 types") {
+		t.Errorf("projectFactsString = %q", s)
 	}
 
 	tf := &TypeFacts{Name: "W", Kind: KindInterface}
 	if s := typeFactsString(tf); !strings.Contains(s, `"W"`) {
 		t.Errorf("typeFactsString = %q", s)
+	}
+	if got := KindInterface.String(); got != "1" {
+		t.Errorf("KindInterface.String = %q, want decimal discriminant", got)
 	}
 
 	te := &TypeExtract{Name: "E"}

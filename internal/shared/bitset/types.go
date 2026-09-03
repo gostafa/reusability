@@ -23,4 +23,16 @@ type (
 	Intersecter interface {
 		Intersects(other SmallFieldSet) bool
 	}
+
+	container interface {
+		Contains(index int) bool
+	}
+
+	counter interface {
+		Count() int
+	}
+
+	cloner interface {
+		Clone() FieldSet
+	}
 )

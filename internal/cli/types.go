@@ -19,10 +19,6 @@ type (
 		minimum float64
 	}
 
-	ruleList struct {
-		items []ruleSpec
-	}
-
 	flagValues = struct {
 		format                         *string
 		webReport                      *bool
@@ -44,7 +40,7 @@ type (
 		showVersion                    *bool
 		verbose                        *bool
 		check                          *bool
-		rules                          ruleList
+		rules                          []ruleSpec
 	}
 
 	// runtimeConfig holds parsed CLI runtime state. Named module types are

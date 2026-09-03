@@ -11,7 +11,7 @@ import (
 
 type (
 	// FactOptions configures one project load.
-	FactOptions struct {
+	FactOptions = struct {
 		Directory        string
 		Patterns         []string
 		BuildTags        []string

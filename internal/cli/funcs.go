@@ -39,8 +39,8 @@ func asConfig(set *flag.FlagSet, vals *flagValues, wts *reusability.Weights) reu
 		IncludeGenerated:   *vals.generated,
 		BuildTags:          splitList(*vals.buildTags),
 		Workers:            *vals.workers,
-		DependencyScope:    reusability.DependencyScope(*vals.dependencyScope),
-		FieldUsageMode:     reusability.FieldUsageMode(*vals.fieldUsage),
+		DependencyScope:    *vals.dependencyScope,
+		FieldUsageMode:     *vals.fieldUsage,
 		ContinueOnError:    *vals.continueOnError,
 		ReusabilityWeights: *wts,
 	}
@@ -501,9 +501,12 @@ func registerMiscFlags(flagSet *flag.FlagSet, vals *flagValues) {
 	vals.showVersion = flagSet.Bool("version", false, "print the version and exit")
 	vals.verbose = flagSet.Bool("verbose", false, "verbose logging to stderr")
 	vals.check = flagSet.Bool("check", false, "enforce -rule thresholds and exit 3 on violations")
-	flagSet.Var(
-		&vals.rules, "rule",
+	flagSet.Func(
+		"rule",
 		"policy rule pattern:min (repeatable; e.g. '**/internal/**':0.8; requires -check)",
+		func(value string) error {
+			return appendRule(&vals.rules, value)
+		},
 	)
 }
 
@@ -548,7 +551,9 @@ func registerWeightFlags(flagSet *flag.FlagSet, vals *flagValues) {
 func renderHelpDocs(path string) (string, error) {
 	fileSink := sinks.FileSink{Path: path}
 
-	err := reporting.WriteDocs(outbound.NewSink(fileSink.Open), version.Version())
+	err := reporting.WriteDocs(outbound.NewSink(func() (*outbound.Stream, error) {
+		return sinks.OpenFile(fileSink)
+	}), version.Version())
 	if err != nil {
 		return emptyString, fmt.Errorf("write help docs: %w", err)
 	}
@@ -560,10 +565,12 @@ func reportSink(output string) outbound.Sink {
 	if output != emptyString {
 		fileSink := sinks.FileSink{Path: output}
 
-		return outbound.NewSink(fileSink.Open)
+		return outbound.NewSink(func() (*outbound.Stream, error) {
+			return sinks.OpenFile(fileSink)
+		})
 	}
 
-	return outbound.NewSink(sinks.StdoutSink{}.Open)
+	return outbound.NewSink(sinks.OpenStdout)
 }
 
 func resolveGating(vals *flagValues, logger *slog.Logger) gatingResult {
@@ -585,12 +592,12 @@ func resolveGating(vals *flagValues, logger *slog.Logger) gatingResult {
 	return gatingResult{rules: resolved, source: source, ok: true}
 }
 
-func resolvePolicy(rules ruleList) (specs []ruleSpec, source string, err error) {
-	if len(rules.items) == exitOK {
+func resolvePolicy(rules []ruleSpec) (specs []ruleSpec, source string, err error) {
+	if len(rules) == exitOK {
 		return nil, emptyString, errNoPolicyRules
 	}
 
-	specs = append([]ruleSpec(nil), rules.items...)
+	specs = append([]ruleSpec(nil), rules...)
 
 	domainRules := policyDomainRules(specs)
 
@@ -724,13 +731,13 @@ func runWebHelp() int {
 	return exitOK
 }
 
-func (list *ruleList) Set(value string) error {
+func appendRule(rules *[]ruleSpec, value string) error {
 	spec, err := parseRuleSpec(value)
 	if err != nil {
 		return fmt.Errorf("set rule: %w", err)
 	}
 
-	list.items = append(list.items, spec)
+	*rules = append(*rules, spec)
 
 	return nil
 }
@@ -767,17 +774,6 @@ func stdoutIsTerminal() bool {
 	info, err := os.Stdout.Stat()
 
 	return err == nil && info.Mode()&os.ModeCharDevice != exitOK
-}
-
-func (list *ruleList) String() string {
-	parts := make([]string, exitOK, len(list.items))
-
-	for i := range list.items {
-		parts = append(parts, list.items[i].pattern+":"+
-			strconv.FormatFloat(list.items[i].minimum, 'g', -1, floatBits))
-	}
-
-	return strings.Join(parts, commaSep)
 }
 
 func wantsWebHelp(args []string) bool {

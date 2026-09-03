@@ -11,6 +11,6 @@ import (
 
 // NewAnalyzer returns the production analyzer: go/packages fact extraction
 // feeding the metric pipeline.
-func NewAnalyzer() *application.Pipeline {
-	return application.NewPipeline(typefacts.NewService(goloader.New()))
+func NewAnalyzer() application.Pipeline {
+	return application.NewPipeline(typefacts.NewServiceFunc(goloader.New()))
 }

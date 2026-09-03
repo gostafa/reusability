@@ -5,7 +5,7 @@ package metrics
 
 type (
 	// MetricResult is one computed metric value with applicability metadata.
-	MetricResult struct {
+	MetricResult = struct {
 		// Name is the metric identifier (for example "reusability").
 		Name string
 		// Scope is whether the metric is type- or package-level.
@@ -29,7 +29,7 @@ type (
 	}
 
 	// ReusabilityComponent is one weighted input to the reusability index.
-	ReusabilityComponent struct {
+	ReusabilityComponent = struct {
 		// Name identifies the component (cohesion, coupling, …).
 		Name string
 		// Reason explains why the component was dropped when not applicable.

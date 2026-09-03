@@ -46,7 +46,7 @@ func TestAssembleResultWorkerError(t *testing.T) {
 		},
 	)
 
-	_, err := pipeline.Analyze(context.Background(), &inbound.Options{
+	_, err := pipeline(context.Background(), &inbound.Options{
 		Patterns: []string{"./..."},
 		Weights:  metrics.DefaultReusabilityWeights(),
 	})
@@ -57,7 +57,7 @@ func TestAssembleResultWorkerError(t *testing.T) {
 
 func TestReportedMetricIsReusability(t *testing.T) {
 	pipeline := NewPipeline(typefacts.NewService(coverageSource{}))
-	result, err := pipeline.Analyze(context.Background(), &inbound.Options{
+	result, err := pipeline(context.Background(), &inbound.Options{
 		Patterns:        []string{"./..."},
 		DependencyScope: "project",
 		Weights:         metrics.DefaultReusabilityWeights(),
@@ -142,7 +142,7 @@ func TestPipelineLoadError(t *testing.T) {
 	sentinel := errors.New("load failed")
 	pipeline := NewPipeline(typefacts.NewService(errSource{err: sentinel}))
 
-	_, err := pipeline.Analyze(context.Background(), &inbound.Options{
+	_, err := pipeline(context.Background(), &inbound.Options{
 		Patterns: []string{"./..."},
 		Weights:  metrics.DefaultReusabilityWeights(),
 	})
@@ -157,7 +157,7 @@ func TestPipelineBadWeights(t *testing.T) {
 
 	pipeline := NewPipeline(typefacts.NewService(fakeSource{mod: "example.com/m"}))
 
-	_, err := pipeline.Analyze(context.Background(), &inbound.Options{
+	_, err := pipeline(context.Background(), &inbound.Options{
 		Patterns: []string{"./..."},
 		Weights:  metrics.ReusabilityWeights{Cohesion: -1, Coupling: 1},
 	})
@@ -212,7 +212,7 @@ func TestPipelineAnalyzeEndToEnd(t *testing.T) {
 	}
 	pipeline := NewPipeline(typefacts.NewService(src))
 
-	result, err := pipeline.Analyze(context.Background(), &inbound.Options{
+	result, err := pipeline(context.Background(), &inbound.Options{
 		Patterns:        []string{"./..."},
 		DependencyScope: "project",
 		Weights:         metrics.DefaultReusabilityWeights(),
@@ -253,7 +253,7 @@ func TestPipelineCancelled(t *testing.T) {
 	cancel()
 
 	pipeline := NewPipeline(typefacts.NewService(fakeSource{mod: "m"}))
-	if _, err := pipeline.Analyze(
+	if _, err := pipeline(
 		ctx,
 		&inbound.Options{Patterns: []string{"./..."}, Weights: metrics.DefaultReusabilityWeights()},
 	); err == nil {

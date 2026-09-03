@@ -38,7 +38,7 @@ type (
 		Docs []jsonMetricDoc `json:"docs"`
 	}
 
-	jsonMetricDoc struct {
+	jsonMetricDoc = struct {
 		FormulaLaTeX   string `json:"formula_latex,omitempty"`
 		NotApplicable  string `json:"not_applicable,omitempty"`
 		FullName       string `json:"full_name"`
@@ -55,7 +55,7 @@ type (
 		Bounded        bool   `json:"bounded"`
 	}
 
-	jsonReport struct {
+	jsonReport = struct {
 		// SchemaVersion is the report schema version.
 		SchemaVersion string `json:"schema_version"`
 		// Tool identifies the producing tool.
@@ -78,21 +78,21 @@ type (
 		Types []jsonType `json:"types"`
 	}
 
-	jsonType struct {
+	jsonType = struct {
 		// Name is the type's declared name.
 		Name string `json:"name"`
 		// Reusability is the type-level reusability index result.
 		Reusability jsonMetric `json:"reusability"`
 	}
 
-	jsonMetric struct {
+	jsonMetric = struct {
 		Value      *float64 `json:"value,omitempty"`
 		Reason     string   `json:"reason,omitempty"`
 		Definition string   `json:"definition"`
 		Applicable bool     `json:"applicable"`
 	}
 
-	webPayload struct {
+	webPayload = struct {
 		// Module is the analyzed main module's path, when known.
 		Module string `json:"module"`
 		// Report is the same document the JSON format emits.

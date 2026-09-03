@@ -32,7 +32,7 @@ func AllMetrics() []MetricName {
 
 // ToolName is embedded in reports as the producing tool.
 func ToolName() string {
-	return string(MetricReusability)
+	return MetricReusability
 }
 
 // Analyze validates the configuration, runs the analysis pipeline once over
@@ -48,7 +48,7 @@ func Analyze(ctx context.Context, config *Config) (Report, error) {
 
 	opts := toInbound(&cfg)
 
-	result, analyzeErr := analyzer.NewAnalyzer().Analyze(ctx, &opts)
+	result, analyzeErr := analyzer.NewAnalyzer()(ctx, &opts)
 	if analyzeErr != nil {
 		return Report{}, fmt.Errorf("analyze: %w", analyzeErr)
 	}
@@ -91,7 +91,7 @@ func toInbound(cfg *Config) inbound.Options {
 		IncludeGenerated:     cfg.IncludeGenerated,
 		BuildTags:            cfg.BuildTags,
 		Workers:              cfg.Workers,
-		DependencyScope:      string(cfg.DependencyScope),
+		DependencyScope:      cfg.DependencyScope,
 		FieldUsageTransitive: cfg.FieldUsageMode == FieldUsageTransitive,
 		ContinueOnError:      cfg.ContinueOnError,
 		Weights:              cfg.ReusabilityWeights,
@@ -120,9 +120,10 @@ func packageReport(pkg *inbound.PackageResult) PackageReport {
 	}
 
 	for idx := range pkg.Types {
-		named := &pkg.Types[idx]
-
-		out.Types[idx] = TypeReport{Name: named.Name, Reusability: named.Reusability}
+		out.Types[idx] = TypeReport{
+			Name:        pkg.Types[idx].Name,
+			Reusability: pkg.Types[idx].Reusability,
+		}
 	}
 
 	return out

@@ -9,9 +9,7 @@ linters:
     - testpackage
     - godot
     - exhaustruct
-  enable:
-    - reusability
-    - distance
+  enable: [reusability, distance]
   settings:
     custom:
       distance:
@@ -32,7 +30,7 @@ linters:
           field-usage: direct
           rules:
             - pattern: '**'
-              min: 0.60
+              min: 0.80
             - pattern: '**/*_test'
               min: 0.0
     asasalint:

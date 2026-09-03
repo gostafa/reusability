@@ -30,22 +30,8 @@ var (
 	errPackageLoadFailures = errors.New("package load errors (use ContinueOnError to skip)")
 )
 
-// Load loads the requested patterns once, deduplicates test variants, and
-// extracts per-package facts with bounded package-level concurrency.
-func (loader *Loader) Load(
-	ctx context.Context,
-	opts *outbound.FactOptions,
-) (modulePath string, extracts []domain.PackageExtract, err error) {
-	modulePath, extracts, err = loader.extract(ctx, opts)
-	if err != nil {
-		return emptyString, nil, fmt.Errorf("loader extract: %w", err)
-	}
-
-	return modulePath, extracts, nil
-}
-
 // New returns a compiler-backed fact source.
-func New() *Loader { return &Loader{extract: extractFacts} }
+func New() Loader { return extractFacts }
 
 func extractFacts(
 	ctx context.Context,
@@ -205,7 +191,7 @@ func extractAll(
 	err := deps.runExtractWorkers(ctx, workerpool.RunConfig{
 		Workers:   workers,
 		TaskCount: len(job.pkgs),
-		Fn:        state.worker(),
+		Fn:        extractWorker(state),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("extract packages: %w", err)
@@ -249,11 +235,11 @@ func generatedPolicy(opts *outbound.FactOptions) generatedInclusion {
 	return excludeGeneratedFiles
 }
 
-func (s *extractWorkerState) worker() func(int) error {
+func extractWorker(state *extractWorkerState) func(int) error {
 	return func(i int) error {
-		pkg := s.job.pkgs[i]
+		pkg := state.job.pkgs[i]
 
-		s.extracts[i] = extractPackage(pkg, &s.opts)
+		state.extracts[i] = extractPackage(pkg, &state.opts)
 		pkg.Syntax = nil
 		pkg.TypesInfo = nil
 		pkg.Types = nil

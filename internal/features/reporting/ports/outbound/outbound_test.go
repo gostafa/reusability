@@ -21,7 +21,7 @@ func TestSinkContract(t *testing.T) {
 		return NewStream(nopWriteCloser{io.Discard}), nil
 	})
 
-	stream, err := sink.Open()
+	stream, err := Open(sink)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestSinkImplementable(t *testing.T) {
 		return NewStream(nopCloser{buf}), nil
 	})
 
-	stream, err := sink.Open()
+	stream, err := Open(sink)
 	if err != nil {
 		t.Fatal(err)
 	}

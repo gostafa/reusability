@@ -5,39 +5,38 @@ package sinks
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"os"
 
 	"github.com/gostafa/reusability/internal/features/reporting/ports/outbound"
 )
 
-var errStdoutUnavailable = errors.New("stdout is unavailable")
-
-// Open creates (or truncates) the sink's destination file.
-func (sink FileSink) Open() (*outbound.Stream, error) {
-	file, createErr := os.Create(sink.Path)
-	if createErr != nil {
-		return nil, fmt.Errorf("create report file: %w", createErr)
+// OpenFile creates (or truncates) the sink's destination file.
+func OpenFile(sink FileSink) (*outbound.Stream, error) {
+	file, err := os.Create(sink.Path)
+	if err != nil {
+		return nil, fmt.Errorf("create report file: %w", err)
 	}
 
 	return outbound.NewStream(file), nil
 }
 
-// Open returns a buffered writer for standard output.
-func (StdoutSink) Open() (*outbound.Stream, error) {
+// OpenStdout returns a buffered writer for standard output.
+func OpenStdout() (*outbound.Stream, error) {
 	if os.Stdout == nil {
 		return nil, errStdoutUnavailable
 	}
 
-	return outbound.NewStream(stdoutStream{w: bufio.NewWriter(os.Stdout)}), nil
+	stream := stdoutStream{writer: bufio.NewWriter(os.Stdout)}
+
+	return outbound.NewStream(stream), nil
 }
 
 // Close flushes buffered output without closing stdout.
 func (stream stdoutStream) Close() error {
-	flushErr := stream.w.Flush()
-	if flushErr != nil {
-		return fmt.Errorf("stdout flush: %w", flushErr)
+	err := stream.writer.Flush()
+	if err != nil {
+		return fmt.Errorf("flush stdout: %w", err)
 	}
 
 	return nil
@@ -45,10 +44,21 @@ func (stream stdoutStream) Close() error {
 
 // Write buffers payload for standard output.
 func (stream stdoutStream) Write(payload []byte) (int, error) {
-	count, writeErr := stream.w.Write(payload)
-	if writeErr != nil {
-		return count, fmt.Errorf("stdout write: %w", writeErr)
+	written, err := stream.writer.Write(payload)
+	if err != nil {
+		return written, fmt.Errorf(
+			"write stdout (%d buffered, %d available): %w",
+			stream.buffered(), stream.available(), err,
+		)
 	}
 
-	return count, nil
+	return written, nil
+}
+
+func (stream stdoutStream) buffered() int {
+	return stream.writer.Buffered()
+}
+
+func (stream stdoutStream) available() int {
+	return stream.writer.Available()
 }

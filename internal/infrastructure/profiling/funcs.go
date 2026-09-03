@@ -11,7 +11,7 @@ import (
 )
 
 type (
-	profileDeps struct {
+	profileDeps = struct {
 		writeHeap func(*os.File) error
 		closeFile func(*os.File) error
 	}

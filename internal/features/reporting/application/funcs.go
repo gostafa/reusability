@@ -18,7 +18,7 @@ import (
 // Write renders the report in the given format into the sink. Options are
 // read only by the text format.
 func Write(req *WriteRequest) error {
-	writer, err := req.Sink.Open()
+	writer, err := outbound.Open(req.Sink)
 	if err != nil {
 		return fmt.Errorf("open sink: %w", err)
 	}
@@ -42,7 +42,7 @@ func Write(req *WriteRequest) error {
 // WriteDocs renders the metrics guide into the sink. It needs no report:
 // the page documents the tool, not one run.
 func WriteDocs(sink outbound.Sink, toolVersion string) error {
-	writer, err := sink.Open()
+	writer, err := outbound.Open(sink)
 	if err != nil {
 		return fmt.Errorf("open docs sink: %w", err)
 	}
@@ -66,8 +66,8 @@ func (pkg jsonPackage) String() string {
 	return fmt.Sprintf("%s: %d types", pkg.Path, len(pkg.Types))
 }
 
-// String summarizes the report envelope for debugging.
-func (report jsonReport) String() string {
+// jsonReportString summarizes the report envelope for debugging.
+func jsonReportString(report *jsonReport) string {
 	return fmt.Sprintf(
 		"schema %s, tool %v, %d packages",
 		report.SchemaVersion, report.Tool, len(report.Packages),

@@ -27,13 +27,7 @@ func CountSharingPairs(sets []bitset.FieldSet, fieldCount int) int {
 // this is the extracted usage as-is; in transitive mode usage is propagated
 // through calls to sibling methods until a fixpoint.
 func EffectiveFieldSets(t *typefacts.TypeFacts, mode FieldUsageMode) []bitset.FieldSet {
-	sets := directFieldSets(t)
-
-	if mode != FieldUsageTransitive || len(t.Fields) == zero {
-		return sets
-	}
-
-	return propagateFieldSets(t, cloneSets(sets))
+	return fieldSetsFor(t, mode)
 }
 
 // TotalFieldAccesses is the number of 1-cells in the method-field matrix:
@@ -46,6 +40,11 @@ func TotalFieldAccesses(sets []bitset.FieldSet) int {
 	}
 
 	return total
+}
+
+// String returns the canonical field-usage mode name.
+func (mode FieldUsageMode) String() string {
+	return string(mode)
 }
 
 func cloneSets(sets []bitset.FieldSet) []bitset.FieldSet {
@@ -100,6 +99,16 @@ func countWideFrom(sets []bitset.FieldSet, index int) int {
 	}
 
 	return sharing
+}
+
+func fieldSetsFor(facts *typefacts.TypeFacts, mode modeStringer) []bitset.FieldSet {
+	sets := directFieldSets(facts)
+
+	if FieldUsageMode(mode.String()) != FieldUsageTransitive || len(facts.Fields) == zero {
+		return sets
+	}
+
+	return propagateFieldSets(facts, cloneSets(sets))
 }
 
 func directFieldSets(t *typefacts.TypeFacts) []bitset.FieldSet {

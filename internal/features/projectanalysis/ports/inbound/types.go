@@ -11,7 +11,7 @@ import (
 
 type (
 	// Options configures one project analysis request.
-	Options struct {
+	Options = struct {
 		// Directory is the module root used when resolving package patterns.
 		Directory string
 		// DependencyScope selects which imports count toward coupling
@@ -36,7 +36,7 @@ type (
 	}
 
 	// TypeResult is one type's analysis outcome.
-	TypeResult struct {
+	TypeResult = struct {
 		// Name is the type's declared name.
 		Name string
 		// Reusability is the type-level reusability index result.
@@ -52,7 +52,7 @@ type (
 	}
 
 	// Result is the full project analysis outcome.
-	Result struct {
+	Result = struct {
 		// ModulePath is the analyzed main module's path, when known.
 		ModulePath string
 		// Packages are the analyzed packages, sorted by import path.

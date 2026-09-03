@@ -11,6 +11,6 @@ plugins:
   - module: github.com/gostafa/reusability
     import: github.com/gostafa/reusability/plugin
     path: .
-  - module: 'github.com/gostafa/distance'
-    import: 'github.com/gostafa/distance/plugin'
+  - module: github.com/gostafa/distance
+    import: github.com/gostafa/distance/plugin
     version: v0.0.1

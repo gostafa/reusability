@@ -508,7 +508,7 @@ func writeFile(t *testing.T, dir, name, content string) {
 func TestLoadFixture(t *testing.T) {
 	t.Parallel()
 
-	mod, pkgs, err := New().Load(context.Background(), &outbound.FactOptions{
+	mod, pkgs, err := New()(context.Background(), &outbound.FactOptions{
 		Directory: fixtureDir(),
 		Patterns:  []string{"./..."},
 	})
@@ -614,7 +614,7 @@ const GeneratedConst = 1
 func GeneratedFunc() {}
 `)
 
-	_, pkgs, err := New().Load(context.Background(), &outbound.FactOptions{
+	_, pkgs, err := New()(context.Background(), &outbound.FactOptions{
 		Directory: dir,
 		Patterns:  []string{"."},
 	})
@@ -668,7 +668,7 @@ func findMethod(t *testing.T, methods []domain.MethodFacts, name string) domain.
 func TestLoadNoMatch(t *testing.T) {
 	t.Parallel()
 
-	_, _, err := New().Load(context.Background(), &outbound.FactOptions{
+	_, _, err := New()(context.Background(), &outbound.FactOptions{
 		Directory: fixtureDir(),
 		Patterns:  []string{"./does-not-exist"},
 	})

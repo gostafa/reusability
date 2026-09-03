@@ -2,5 +2,3 @@
 // SPDX-License-Identifier: Apache-2.0.
 
 package application
-
-var _ Collector = (*Service)(nil)

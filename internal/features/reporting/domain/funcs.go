@@ -233,7 +233,7 @@ func writeModuleLine(builder *strings.Builder, module string, color bool) error 
 func buildTextTable(report *reusability.Report) *textTable {
 	table := &textTable{typeCols: reportColumns(report)}
 
-	table.rows = append(table.rows, textHeaderRow(table.typeCols))
+	table.rows = append(table.rows, headerCells(table))
 
 	root := buildTree(report)
 
@@ -246,25 +246,25 @@ func buildTextTable(report *reusability.Report) *textTable {
 	return table
 }
 
-func textHeaderRow(typeCols []string) []tableCell {
-	header := make([]tableCell, indexZero, len(typeCols)+1)
+func headerCells(table *textTable) []tableCell {
+	header := make([]tableCell, indexZero, len(table.typeCols)+1)
 
 	header = append(header, tableCell{text: pathTypeHeader, style: ansiDim})
 
-	for i := range typeCols {
-		header = append(header, tableCell{text: abbrev(typeCols[i]), style: ansiDim})
+	for i := range table.typeCols {
+		header = append(header, tableCell{text: abbrev(table.typeCols[i]), style: ansiDim})
 	}
 
 	return header
 }
 
 func emitTreeRows(table *textTable, root *treeNode, summaries map[*treeNode]*treeSummary) {
-	if root.pkg != nil {
+	if packageOf(root) != nil {
 		emitModuleSummary(table, root, summaries[root])
 	}
 
 	for i := range root.children {
-		if root.pkg != nil || i > indexZero {
+		if packageOf(root) != nil || i > indexZero {
 			table.rows = append(table.rows, nil)
 		}
 
@@ -324,14 +324,21 @@ func writeTextRows(builder *strings.Builder, table *textTable, color bool) (bool
 }
 
 func measureRows(table *textTable) ([]int, bool) {
-	widths := zeroIntSlice(len(table.typeCols) + 1)
-	sawNA := false
+	measureTable(table)
+
+	return table.widths, table.sawNA
+}
+
+func measureTable(table *textTable) {
+	table.sawNA = false
+
+	table.widths = zeroIntSlice(len(table.typeCols) + 1)
 
 	for i := range table.rows {
-		sawNA = measureRow(table.rows[i], widths) || sawNA
+		if measureRow(table.rows[i], table.widths) {
+			table.sawNA = true
+		}
 	}
-
-	return widths, sawNA
 }
 
 func zeroIntSlice(size int) []int {
@@ -358,7 +365,7 @@ func measureRow(row []tableCell, widths []int) bool {
 	sawNA := false
 
 	for idx := range row {
-		widths[idx] = max(widths[idx], row[idx].width())
+		widths[idx] = max(widths[idx], cellWidth(&row[idx]))
 
 		if row[idx].text == naCell {
 			sawNA = true
@@ -463,7 +470,7 @@ func writeCellPad(args *rowWriteArgs, idx int) error {
 	}
 
 	cell := &args.row[idx]
-	pad := strings.Repeat(spaceString, args.widths[idx]-cell.width()+countTwo)
+	pad := strings.Repeat(spaceString, args.widths[idx]-cellWidth(cell)+countTwo)
 
 	err := writeBuilderString(args.builder, pad)
 	if err != nil {
@@ -565,13 +572,15 @@ func aggregateTree(node *treeNode, summaries map[*treeNode]*treeSummary) *treeSu
 }
 
 func accumulateSelf(node *treeNode, summary *treeSummary) {
-	if node.pkg == nil {
+	pkg := packageOf(node)
+
+	if pkg == nil {
 		return
 	}
 
 	summary.pkgsTotal = countOne
-	summary.typesTotal = len(node.pkg.Types)
-	collectPackageStats(node.pkg, summary.typeAgg)
+	summary.typesTotal = len(pkg.Types)
+	collectPackageStats(pkg, summary.typeAgg)
 }
 
 func accumulateChildren(
@@ -613,7 +622,7 @@ func attachPackage(root *treeNode, pkg *reusability.PackageReport, module string
 	rel := relPath(pkg.Path, module)
 
 	if rel == pathDot {
-		root.pkg = pkg
+		root.pkg = &packageRef{report: pkg}
 
 		return
 	}
@@ -621,15 +630,15 @@ func attachPackage(root *treeNode, pkg *reusability.PackageReport, module string
 	node := root
 
 	for seg := range strings.SplitSeq(rel, "/") {
-		node = appendTreeChild(&node.children, seg)
+		node = child(node, seg)
 	}
 
-	node.pkg = pkg
+	node.pkg = &packageRef{report: pkg}
 }
 
 func compressChildren(root *treeNode) {
 	for i := range root.children {
-		root.children[i].compress()
+		compressTree(root.children[i])
 	}
 }
 
@@ -716,8 +725,10 @@ func nodeTypeAggCells(summary *treeSummary, typeCols []string) []tableCell {
 }
 
 func nodeTypeCount(node *treeNode, typeCols []string) int {
-	if node.pkg != nil && len(typeCols) > indexZero {
-		return len(node.pkg.Types)
+	pkg := packageOf(node)
+
+	if pkg != nil && len(typeCols) > indexZero {
+		return len(pkg.Types)
 	}
 
 	return indexZero
@@ -786,11 +797,15 @@ func formatOneNote(pkg *reusability.PackageReport, entry *noteEntry) string {
 }
 
 func paint(args *paintArgs) string {
-	if !args.color || args.style == emptyString {
-		return args.text
+	return paintText(&TextOptions{Color: args.color}, args.text, args.style)
+}
+
+func paintText(opts *TextOptions, text, style string) string {
+	if !opts.Color || style == emptyString {
+		return text
 	}
 
-	return args.style + args.text + ansiReset
+	return style + text + ansiReset
 }
 
 func relPath(path, module string) string {
@@ -848,6 +863,10 @@ func oneReusabilityCell(
 		text:  formatCell(result.Value),
 		style: valueColor(name, result.Value, stats[name]),
 	}
+}
+
+func cellWidth(sizer cellSizer) int {
+	return sizer.width()
 }
 
 func (cell *tableCell) width() int {
@@ -913,15 +932,22 @@ func emitChildNodes(input *treeEmitInput) {
 }
 
 func nodeRow(input *nodeRowInput) {
-	row := make([]tableCell, indexZero, len(input.table.typeCols)+1)
+	summary := input.node.Summary()
+	capacity := len(input.table.typeCols) + countOne + summary.childCount
 
-	row = append(row, tableCell{prefix: input.label, text: input.node.name, style: ansiBold})
+	if summary.hasPackage {
+		capacity++
+	}
+
+	row := make([]tableCell, indexZero, capacity)
+
+	row = append(row, tableCell{prefix: input.label, text: summary.name, style: ansiBold})
 	row = append(row, nodeTypeAggCells(input.summary, input.table.typeCols)...)
 	input.table.rows = append(input.table.rows, row)
 }
 
 func typeRow(input *typeRowInput) {
-	typ := &input.node.pkg.Types[input.index]
+	typ := &packageOf(input.node).Types[input.index]
 	row := make([]tableCell, indexZero, len(input.table.typeCols)+1)
 
 	row = append(row, tableCell{prefix: input.prefix + input.connector, text: typ.Name})
@@ -947,23 +973,23 @@ func thresholdColor(bias scoreBias, score float64) string {
 	}
 }
 
-func appendTreeChild(children *[]*treeNode, name string) *treeNode {
-	for i := range *children {
-		if (*children)[i].name == name {
-			return (*children)[i]
+func child(node *treeNode, name string) *treeNode {
+	for i := range node.children {
+		if node.children[i].name == name {
+			return node.children[i]
 		}
 	}
 
-	child := &treeNode{name: name}
+	created := &treeNode{name: name}
 
-	*children = append(*children, child)
+	node.children = append(node.children, created)
 
-	return child
+	return created
 }
 
-func (node *treeNode) compress() {
-	for node.pkg == nil && len(node.children) == countOne {
-		node.absorbOnlyChild()
+func compressTree(node *treeNode) {
+	for packageOf(node) == nil && len(node.children) == countOne {
+		absorbOnlyChild(node)
 	}
 
 	compressTreeChildren(node.children)
@@ -971,16 +997,33 @@ func (node *treeNode) compress() {
 
 func compressTreeChildren(children []*treeNode) {
 	for i := range children {
-		children[i].compress()
+		compressTree(children[i])
 	}
 }
 
-func (node *treeNode) absorbOnlyChild() {
+func absorbOnlyChild(node *treeNode) {
 	child := node.children[indexZero]
 
 	node.name = node.name + "/" + child.name
 	node.pkg = child.pkg
 	node.children = child.children
+}
+
+func packageOf(node *treeNode) *reusability.PackageReport {
+	if node.pkg == nil {
+		return nil
+	}
+
+	return node.pkg.report
+}
+
+// Summary returns renderer metadata for the node.
+func (node *treeNode) Summary() (summary treeNodeSummary) {
+	return treeNodeSummary{
+		name:       node.name,
+		hasPackage: node.pkg != nil,
+		childCount: len(node.children),
+	}
 }
 
 func valueColor(name string, value float64, stat *columnStats) string {

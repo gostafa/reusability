@@ -8,6 +8,11 @@ import (
 )
 
 type (
+	// kindViewer exposes a named type's underlying kind code.
+	kindViewer interface {
+		Code() uint8
+	}
+
 	// PackageExtract is one package's raw extraction before ID assignment.
 	PackageExtract = struct {
 		// Path is the package import path.

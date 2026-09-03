@@ -14,7 +14,7 @@ type (
 	DocScope string
 
 	// MetricDoc is one entry in the metrics guide.
-	MetricDoc struct {
+	MetricDoc = struct {
 		// FormulaLaTeX is the metric formula in LaTeX.
 		FormulaLaTeX string
 		// NotApplicable explains when the metric does not apply.
@@ -49,7 +49,7 @@ type (
 	Format string
 
 	// TextOptions controls human-readable text report rendering.
-	TextOptions struct {
+	TextOptions = struct {
 		// Color wraps values in ANSI quality colors. Callers enable it only
 		// when the destination understands escapes (a terminal).
 		Color bool
@@ -58,7 +58,11 @@ type (
 		Explain bool
 	}
 
-	scoreBias int
+	cellSizer interface {
+		width() int
+	}
+
+	scoreBias = int
 
 	metricQuality = struct {
 		bias    scoreBias
@@ -73,8 +77,18 @@ type (
 
 	treeNode struct {
 		name     string
-		pkg      *reusability.PackageReport
+		pkg      *packageRef
 		children []*treeNode
+	}
+
+	packageRef = struct {
+		report *reusability.PackageReport
+	}
+
+	treeNodeSummary = struct {
+		name       string
+		hasPackage bool
+		childCount int
 	}
 
 	treeSummary = struct {
@@ -86,21 +100,23 @@ type (
 	textTable = struct {
 		typeCols []string
 		rows     [][]tableCell
+		widths   []int
+		sawNA    bool
 	}
 
-	columnStats struct {
+	columnStats = struct {
 		sum     float64
 		count   int
 		minimum float64
 		maximum float64
 	}
 
-	noteEntry struct {
+	noteEntry = struct {
 		reason string
 		types  []string
 	}
 
-	paintArgs struct {
+	paintArgs = struct {
 		text  string
 		style string
 		color bool
@@ -147,7 +163,7 @@ type (
 		label   string
 	}
 
-	notesBodyArgs struct {
+	notesBodyArgs = struct {
 		builder *strings.Builder
 		path    string
 		notes   []string

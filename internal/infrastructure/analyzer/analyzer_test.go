@@ -17,7 +17,7 @@ import (
 func TestAnalyzeFixture(t *testing.T) {
 	t.Parallel()
 
-	result, err := NewAnalyzer().Analyze(context.Background(), &inbound.Options{
+	result, err := NewAnalyzer()(context.Background(), &inbound.Options{
 		Directory:       filepath.Join("..", "..", "..", "testdata", "fixture"),
 		Patterns:        []string{"./..."},
 		DependencyScope: "module",

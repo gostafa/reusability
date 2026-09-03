@@ -9,13 +9,13 @@ import (
 
 type (
 	// DependencyScope selects which imports count toward coupling.
-	DependencyScope string
+	DependencyScope = string
 
 	// FieldUsageMode selects direct or transitive field-usage counting.
-	FieldUsageMode string
+	FieldUsageMode = string
 
 	// MetricName identifies a reported metric.
-	MetricName string
+	MetricName = string
 
 	// Weights is the reusability component weight set.
 	Weights = metrics.ReusabilityWeights

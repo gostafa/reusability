@@ -104,7 +104,7 @@ func TestCollectPropagatesLoadError(t *testing.T) {
 	sentinel := errors.New("load failed")
 	_, err := NewService(
 		errSource{err: sentinel},
-	).Collect(context.Background(), &outbound.FactOptions{})
+	)(context.Background(), &outbound.FactOptions{})
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("Collect error = %v, want sentinel", err)
 	}
@@ -197,7 +197,7 @@ func TestServiceCollect(t *testing.T) {
 
 	svc := NewService(fakeSource{})
 
-	facts, err := svc.Collect(
+	facts, err := svc(
 		context.Background(),
 		&outbound.FactOptions{Patterns: []string{"./..."}},
 	)

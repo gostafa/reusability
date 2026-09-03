@@ -8,8 +8,18 @@ import (
 )
 
 type (
+	// PathMatcher matches import paths against a policy pattern.
+	PathMatcher interface {
+		Matches(importPath string) bool
+	}
+
+	// RuleGate exposes the minimum reusability for a matching rule.
+	RuleGate interface {
+		MinReusability() float64
+	}
+
 	// Violation records one type that fell below a matching rule's minimum.
-	Violation struct {
+	Violation = struct {
 		Package   string
 		Type      string
 		Rule      string
@@ -28,7 +38,7 @@ type (
 		Min float64
 	}
 
-	matchPos struct {
+	matchPos = struct {
 		pi, si int
 	}
 

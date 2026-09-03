@@ -53,7 +53,7 @@ func TestServiceComputeForType(t *testing.T) {
 		DocumentedExportedMembers: 2,
 	}
 
-	got := svc.ComputeForType(tf, "direct")
+	got := svc(tf, "direct")
 	if got.CBO != metrics.CBO(2) {
 		t.Errorf("CBO = %+v, want %+v", got.CBO, metrics.CBO(2))
 	}
@@ -85,7 +85,7 @@ func TestServiceEndToEnd(t *testing.T) {
 		DocumentedExportedMembers: 1,
 	}
 
-	got := svc.ComputeForType(tf, "direct")
+	got := svc(tf, "direct")
 	if got.CBO.Value != 3 {
 		t.Errorf("CBO = %v, want 3", got.CBO.Value)
 	}

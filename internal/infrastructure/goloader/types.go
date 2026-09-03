@@ -194,14 +194,12 @@ type (
 		policy packageErrorPolicy
 	}
 
-	extractWorkerState struct {
+	extractWorkerState = struct {
 		job      *extractJob
 		extracts []domain.PackageExtract
 		opts     extractorOptions
 	}
 
 	// Loader is a compiler-backed outbound.FactSource.
-	Loader struct {
-		extract func(context.Context, *outbound.FactOptions) (string, []domain.PackageExtract, error)
-	}
+	Loader = func(context.Context, *outbound.FactOptions) (string, []domain.PackageExtract, error)
 )

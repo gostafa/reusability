@@ -17,9 +17,11 @@ func TestFileSinkRoundTrip(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "report.json")
 
-	sink := outbound.NewSink(FileSink{Path: path}.Open)
+	sink := outbound.NewSink(func() (*outbound.Stream, error) {
+		return OpenFile(FileSink{Path: path})
+	})
 
-	stream, err := sink.Open()
+	stream, err := outbound.Open(sink)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +56,7 @@ func TestStdoutSinkWritesToStdout(t *testing.T) {
 	os.Stdout = writer
 	defer func() { os.Stdout = orig }()
 
-	stream, err := StdoutSink{}.Open()
+	stream, err := OpenStdout()
 	if err != nil {
 		t.Fatal(err)
 	}

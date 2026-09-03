@@ -217,7 +217,7 @@ func matchingRule(importPath string, rules []Rule) (threshold float64, pattern s
 			continue
 		}
 
-		threshold = rule.Min
+		threshold = rule.MinReusability()
 		pattern = rule.Pattern
 	}
 
@@ -225,7 +225,7 @@ func matchingRule(importPath string, rules []Rule) (threshold float64, pattern s
 }
 
 func matchingCandidate(rule *Rule, importPath, currentPattern string) *Rule {
-	if !MatchPackage(rule.Pattern, importPath) {
+	if !rule.Matches(importPath) {
 		return nil
 	}
 
@@ -234,6 +234,16 @@ func matchingCandidate(rule *Rule, importPath, currentPattern string) *Rule {
 	}
 
 	return rule
+}
+
+// Matches reports whether the rule pattern matches importPath.
+func (rule Rule) Matches(importPath string) bool {
+	return MatchPackage(rule.Pattern, importPath)
+}
+
+// MinReusability returns the minimum acceptable reusability for this rule.
+func (rule Rule) MinReusability() float64 {
+	return rule.Min
 }
 
 func moreSpecific(candidate, current string) bool {

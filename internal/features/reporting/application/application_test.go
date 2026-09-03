@@ -75,14 +75,14 @@ func TestWriteOpenAndRenderErrors(t *testing.T) {
 }
 
 func TestJSONDebugStringsAndMarshalError(t *testing.T) {
-	reportSummary := (jsonReport{
+	reportSummary := jsonReportString(&jsonReport{
 		SchemaVersion: "3",
 		Tool:          jsonTool{Name: "reusability", Version: "test"},
 		Packages:      []jsonPackage{{Path: "example.com/p"}},
-	}).String()
+	})
 	if !strings.Contains(reportSummary, "schema 3") ||
 		!strings.Contains(reportSummary, "1 packages") {
-		t.Fatalf("jsonReport.String() = %q", reportSummary)
+		t.Fatalf("jsonReportString() = %q", reportSummary)
 	}
 
 	packageSummary := (jsonPackage{Path: "example.com/p", Types: make([]jsonType, 1)}).String()

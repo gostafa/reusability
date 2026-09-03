@@ -32,19 +32,27 @@ func Assemble(modulePath string, extracts []domain.PackageExtract) domain.Projec
 }
 
 // NewService returns a Service backed by the given fact source.
-func NewService(source outbound.FactSource) *Service {
-	return &Service{source: source}
+func NewService(source outbound.FactSource) Service {
+	return NewServiceFunc(source.Load)
 }
 
-// Collect loads the project once and returns its assembled facts.
-func (svc *Service) Collect(
+// NewServiceFunc returns a Service backed by the given fact source function.
+func NewServiceFunc(source factSourceFunc) Service {
+	return func(ctx context.Context, opts *outbound.FactOptions) (domain.ProjectFacts, error) {
+		return collectFacts(ctx, source, opts)
+	}
+}
+
+// collectFacts loads the project once and returns its assembled facts.
+func collectFacts(
 	ctx context.Context,
+	source factSourceFunc,
 	opts *outbound.FactOptions,
 ) (domain.ProjectFacts, error) {
 	// Load package extracts from the fact source then assemble project facts.
-	modulePath, extracts, err := svc.source.Load(ctx, opts)
+	modulePath, extracts, err := source(ctx, opts)
 	if err != nil {
-		return domain.ProjectFacts{}, fmt.Errorf("Collect: %w", err)
+		return domain.ProjectFacts{}, fmt.Errorf("collect: %w", err)
 	}
 
 	return Assemble(modulePath, extracts), nil

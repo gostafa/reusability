@@ -3,5 +3,8 @@
 
 package sinks
 
-// Compile-time helpers live in funcs.go; Sink is an outbound.Sink value
-// produced via outbound.NewSink wrappers rather than type assertions.
+import (
+	"errors"
+)
+
+var errStdoutUnavailable = errors.New("stdout is unavailable")

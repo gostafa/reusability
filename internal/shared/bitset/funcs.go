@@ -9,6 +9,11 @@ import (
 
 // Clone returns an independent copy of fieldSet.
 func Clone(fieldSet FieldSet) FieldSet {
+	return cloneOf(fieldSet)
+}
+
+// Clone returns an independent copy of the set.
+func (fieldSet FieldSet) Clone() FieldSet {
 	if fieldSet.words == nil {
 		return FieldSet{}
 	}
@@ -22,6 +27,11 @@ func Clone(fieldSet FieldSet) FieldSet {
 
 // Contains reports whether the field at index is set.
 func Contains(fieldSet FieldSet, index int) bool {
+	return containsAt(fieldSet, index)
+}
+
+// Contains reports whether the field at index is set.
+func (fieldSet FieldSet) Contains(index int) bool {
 	word := index / wordBits
 
 	if word >= len(fieldSet.words) {
@@ -33,6 +43,11 @@ func Contains(fieldSet FieldSet, index int) bool {
 
 // Count returns the number of set fields.
 func Count(fieldSet FieldSet) int {
+	return countOf(fieldSet)
+}
+
+// Count returns the number of set fields.
+func (fieldSet FieldSet) Count() int {
 	total := zero
 
 	for i := range fieldSet.words {
@@ -89,4 +104,16 @@ func Union(dst, src FieldSet) {
 	for i := range src.words {
 		dst.words[i] |= src.words[i]
 	}
+}
+
+func cloneOf(source cloner) FieldSet {
+	return source.Clone()
+}
+
+func containsAt(holder container, index int) bool {
+	return holder.Contains(index)
+}
+
+func countOf(holder counter) int {
+	return holder.Count()
 }

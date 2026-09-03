@@ -4,11 +4,12 @@
 package domain
 
 const (
-
 	// KindStruct marks a named type whose underlying type is a struct.
-	KindStruct TypeKind = iota
+	KindStruct TypeKind = 0
 	// KindInterface marks a named type whose underlying type is an interface.
-	KindInterface
+	KindInterface TypeKind = 1
 	// KindOther marks any other named type (basic, slice, func, …).
-	KindOther
+	KindOther TypeKind = 2
+
+	decimalBase = 10
 )

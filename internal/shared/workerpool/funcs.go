@@ -58,10 +58,10 @@ func emptyPoolResult(ctx context.Context) error {
 
 func runPool(ctx context.Context, cfg RunConfig) error {
 	workerPool := newPool(cfg)
-	workerPool.dispatch(ctx)
-	workerPool.wait()
+	dispatch(ctx, workerPool)
+	wait(workerPool)
 
-	err := workerPool.result(ctx)
+	err := poolResult(ctx, workerPool)
 	if err != nil {
 		return fmt.Errorf("workerpool run: %w", err)
 	}
@@ -101,13 +101,13 @@ func newPool(cfg RunConfig) *pool {
 	workerPool.wg.Add(workers)
 
 	for range workers {
-		go workerPool.worker(cfg.Fn)
+		go worker(workerPool, cfg.Fn)
 	}
 
 	return workerPool
 }
 
-func (workerPool *pool) dispatch(ctx context.Context) {
+func dispatch(ctx context.Context, workerPool *pool) {
 	for i := zero; i < len(workerPool.errs); i++ {
 		select {
 		case workerPool.tasks <- i:
@@ -117,7 +117,7 @@ func (workerPool *pool) dispatch(ctx context.Context) {
 	}
 }
 
-func (workerPool *pool) result(ctx context.Context) error {
+func poolResult(ctx context.Context, workerPool *pool) error {
 	err := contextError(ctx, "workerpool result")
 	if err != nil {
 		return fmt.Errorf("pool result: %w", err)
@@ -132,12 +132,12 @@ func (workerPool *pool) result(ctx context.Context) error {
 	return nil
 }
 
-func (workerPool *pool) wait() {
+func wait(workerPool *pool) {
 	close(workerPool.tasks)
 	workerPool.wg.Wait()
 }
 
-func (workerPool *pool) worker(fn func(int) error) {
+func worker(workerPool *pool, fn func(int) error) {
 	defer workerPool.wg.Done()
 
 	for i := range workerPool.tasks {

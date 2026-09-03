@@ -26,13 +26,13 @@ func registerModule() int {
 }
 
 // New constructs the Module Plugin from golangci-lint custom settings.
-func New(raw any) (*Plugin, error) {
+func New(raw any) (Plugin, error) {
 	settings, err := decodePluginSettings(raw)
 	if err != nil {
 		return nil, fmt.Errorf("New: %w", err)
 	}
 
-	return &Plugin{build: analyzerBuilder(&settings)}, nil
+	return Plugin(analyzerBuilder(&settings)), nil
 }
 
 func analyzerBuilder(settings *analyzer.Settings) func() ([]*analysis.Analyzer, error) {
@@ -67,8 +67,8 @@ func decodePluginSettings(raw any) (analyzer.Settings, error) {
 }
 
 // BuildAnalyzers returns the reusability go/analysis Analyzer.
-func (plugin *Plugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
-	analyzers, err := plugin.build()
+func (build Plugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
+	analyzers, err := build()
 	if err != nil {
 		return nil, fmt.Errorf("build analyzers: %w", err)
 	}
@@ -82,6 +82,6 @@ func (loadMode) value() string {
 
 // GetLoadMode requests type information so diagnostics can locate type
 // declarations accurately.
-func (plugin *Plugin) GetLoadMode() string {
-	return plugin.mode.value()
+func (Plugin) GetLoadMode() string {
+	return loadMode{}.value()
 }

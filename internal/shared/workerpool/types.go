@@ -9,13 +9,13 @@ import (
 
 type (
 	// RunConfig configures a bounded parallel map over task indices.
-	RunConfig struct {
+	RunConfig = struct {
 		Fn        func(i int) error
 		Workers   int
 		TaskCount int
 	}
 
-	pool struct {
+	pool = struct {
 		tasks chan int
 		errs  []error
 		wg    sync.WaitGroup

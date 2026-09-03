@@ -15,12 +15,10 @@ import (
 
 type (
 	// Pipeline orchestrates fact collection and metric computation.
-	Pipeline struct {
-		analyze func(context.Context, *inbound.Options) (inbound.Result, error)
-	}
+	Pipeline = func(context.Context, *inbound.Options) (inbound.Result, error)
 
 	pipelineInput = struct {
-		facts      typefacts.Collector
+		facts      typefacts.Service
 		opts       *inbound.Options
 		runWorkers func(context.Context, workerpool.RunConfig) error
 	}
@@ -28,14 +26,14 @@ type (
 	packageAnalysisInput = struct {
 		pipeline   *pipelineInput
 		facts      *tfdomain.ProjectFacts
-		calculator *reusability.Service
+		calculator reusability.Service
 		pkgID      int
 	}
 
 	workerConfigInput = struct {
 		pipeline       *pipelineInput
 		facts          *tfdomain.ProjectFacts
-		calculator     *reusability.Service
+		calculator     reusability.Service
 		packageResults []inbound.PackageResult
 	}
 )
