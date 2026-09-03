@@ -5,7 +5,7 @@ runs:
   using: composite
   steps:
     - name: Prepare Go project
-      uses: ./.github/actions/setup
+      uses: $/.github/actions/setup
     - name: Run CI
       shell: bash
       run: task taskotter:ci
