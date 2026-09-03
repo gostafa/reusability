@@ -11,6 +11,14 @@ import (
 )
 
 type (
+	packageBuild = struct {
+		facts   *domain.ProjectFacts
+		extract *domain.PackageExtract
+		idByKey map[string]int
+		pkgID   int
+		typeID  int
+	}
+
 	typeBuild = struct {
 		idByKey map[string]int
 		extract domain.TypeExtract

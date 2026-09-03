@@ -10,7 +10,7 @@ import (
 type (
 	// Plugin is the golangci-lint module plugin for reusability.
 	Plugin struct {
-		loadMode
+		mode loadMode
 
 		build func() ([]*analysis.Analyzer, error)
 	}

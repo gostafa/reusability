@@ -163,16 +163,12 @@ func metricJSON(metric *reusability.MetricResult) jsonMetric {
 }
 
 func render(input *renderInput) error {
-	err := dispatchRender(input)
+	err := renderStructured(input)
 	if err != nil {
 		return fmt.Errorf("render: %w", err)
 	}
 
 	return nil
-}
-
-func dispatchRender(input *renderInput) error {
-	return renderStructured(input)
 }
 
 func renderStructured(input *renderInput) error {

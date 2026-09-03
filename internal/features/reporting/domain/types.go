@@ -111,6 +111,40 @@ type (
 		row     []tableCell
 		widths  []int
 		color   bool
+		last    int
+	}
+
+	textTailInput = struct {
+		builder *strings.Builder
+		report  *reusability.Report
+		opts    TextOptions
+		sawNA   bool
+	}
+
+	treeEmitInput = struct {
+		table     *textTable
+		node      *treeNode
+		summaries map[*treeNode]*treeSummary
+		prefix    string
+		connector string
+		typeCount int
+		total     int
+	}
+
+	typeRowInput = struct {
+		table     *textTable
+		node      *treeNode
+		summary   *treeSummary
+		prefix    string
+		connector string
+		index     int
+	}
+
+	nodeRowInput = struct {
+		table   *textTable
+		node    *treeNode
+		summary *treeSummary
+		label   string
 	}
 
 	notesBodyArgs struct {

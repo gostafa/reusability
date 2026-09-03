@@ -50,7 +50,7 @@ type (
 		onConflict constConflictAction
 	}
 
-	testMergeState struct {
+	testMergeState = struct {
 		seenFuncs   map[string]bool
 		seenConsts  map[string]string
 		seenImports map[string]bool
@@ -63,6 +63,24 @@ type (
 		otherDecls  []ast.Decl
 	}
 
+	testDeclIngest = struct {
+		decl ast.Decl
+		name string
+		mode testFileMode
+	}
+
+	testFileIngest = struct {
+		file *ast.File
+		name string
+		mode testFileMode
+	}
+
+	dupFuncIngest = struct {
+		funcDecl *ast.FuncDecl
+		name     string
+		mode     testFileMode
+	}
+
 	prodScanResult = struct {
 		fset       *token.FileSet
 		packageDoc string
@@ -72,6 +90,15 @@ type (
 		testFiles  []string
 		allDecls   []pkgDecl
 		pkgImports []ast.Spec
+	}
+
+	prodScanBuild = struct {
+		pkg   *packageInfo
+		fset  *token.FileSet
+		doc   string
+		prod  []string
+		test  []string
+		decls []pkgDecl
 	}
 
 	replaceInput struct {

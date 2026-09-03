@@ -83,5 +83,5 @@ func (loadMode) value() string {
 // GetLoadMode requests type information so diagnostics can locate type
 // declarations accurately.
 func (plugin *Plugin) GetLoadMode() string {
-	return plugin.value()
+	return plugin.mode.value()
 }

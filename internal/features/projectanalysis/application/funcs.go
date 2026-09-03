@@ -18,10 +18,10 @@ import (
 
 // NewPipeline returns a pipeline backed by the given fact collector.
 func NewPipeline(facts typefacts.Collector) *Pipeline {
-	return newPipeline(facts, workerpool.Run)
+	return pipelineWithWorkers(facts, workerpool.Run)
 }
 
-func newPipeline(
+func pipelineWithWorkers(
 	facts typefacts.Collector,
 	runWorkers func(context.Context, workerpool.RunConfig) error,
 ) *Pipeline {
@@ -55,7 +55,12 @@ func runPipeline(ctx context.Context, input *pipelineInput) (inbound.Result, err
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAnalyze, err)
 	}
 
-	return runPreparedPipeline(ctx, input, calculator)
+	result, err := runPreparedPipeline(ctx, input, calculator)
+	if err != nil {
+		return inbound.Result{}, fmt.Errorf(errFmtOp, opAnalyze, err)
+	}
+
+	return result, nil
 }
 
 func runPreparedPipeline(
@@ -68,7 +73,9 @@ func runPreparedPipeline(
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAnalyze, err)
 	}
 
-	result, err := assembleResult(ctx, input, projectFacts, calculator)
+	result, err := assembleResult(ctx, &workerConfigInput{
+		pipeline: input, facts: projectFacts, calculator: calculator,
+	})
 	if err != nil {
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAssemble, err)
 	}
@@ -119,21 +126,19 @@ func analyzeType(
 
 func assembleResult(
 	ctx context.Context,
-	input *pipelineInput,
-	facts *tfdomain.ProjectFacts,
-	calculator *reusability.Service,
+	input *workerConfigInput,
 ) (inbound.Result, error) {
 	err := ctx.Err()
 	if err != nil {
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAssemble, err)
 	}
 
-	packageResults, err := fillPackageResults(ctx, input, facts, calculator)
+	packageResults, err := fillPackageResults(ctx, input)
 	if err != nil {
 		return inbound.Result{}, fmt.Errorf(errFmtOp, opAssemble, err)
 	}
 
-	return inbound.Result{ModulePath: facts.ModulePath, Packages: packageResults}, nil
+	return inbound.Result{ModulePath: input.facts.ModulePath, Packages: packageResults}, nil
 }
 
 func collectOptions(opts *inbound.Options) tfoutbound.FactOptions {
@@ -158,19 +163,17 @@ func fieldUsageMode(opts *inbound.Options) string {
 
 func fillPackageResults(
 	ctx context.Context,
-	input *pipelineInput,
-	facts *tfdomain.ProjectFacts,
-	calculator *reusability.Service,
+	input *workerConfigInput,
 ) ([]inbound.PackageResult, error) {
-	packageResults := make([]inbound.PackageResult, zero, len(facts.Packages))
+	packageResults := make([]inbound.PackageResult, zero, len(input.facts.Packages))
 
-	for range facts.Packages {
+	for range input.facts.Packages {
 		packageResults = append(packageResults, inbound.PackageResult{})
 	}
 
-	err := input.runWorkers(ctx, packageWorkerConfig(&workerConfigInput{
-		pipeline: input, facts: facts, calculator: calculator, packageResults: packageResults,
-	}))
+	input.packageResults = packageResults
+
+	err := input.pipeline.runWorkers(ctx, packageWorkerConfig(input))
 	if err != nil {
 		return nil, fmt.Errorf("fill packages: %w", err)
 	}

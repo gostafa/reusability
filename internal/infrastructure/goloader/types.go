@@ -95,6 +95,48 @@ type (
 		includeGenerated bool
 	}
 
+	typeRefsDocsInput = struct {
+		out            *domain.TypeExtract
+		ctx            *extractCtx
+		typeName       *types.TypeName
+		refs           *refCollector
+		fieldPositions []token.Pos
+		docMethods     []methodDocInput
+	}
+
+	fillMethodsInput = struct {
+		out        *domain.TypeExtract
+		ctx        *extractCtx
+		named      *types.Named
+		refs       *refCollector
+		fieldIndex map[*types.Var]int
+	}
+
+	memberDocsInput = struct {
+		idx            *syntaxIndex
+		typeName       *types.TypeName
+		fields         []domain.FieldFacts
+		fieldPositions []token.Pos
+		methods        []methodDocInput
+	}
+
+	fieldDocsInput = struct {
+		fieldDocs      []docRange
+		fields         []domain.FieldFacts
+		fieldPositions []token.Pos
+		exported       int
+		documented     int
+	}
+
+	methodFactsInput = struct {
+		ctx         *extractCtx
+		method      methodDecl
+		refs        *refCollector
+		fieldIndex  map[*types.Var]int
+		methodIndex map[*types.Func]int
+		fieldCount  int
+	}
+
 	skipPosRequest = struct {
 		fset      *token.FileSet
 		generated map[string]bool

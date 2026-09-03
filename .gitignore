@@ -4,3 +4,7 @@ custom-gcl
 junit.xml
 reusability-report.html
 .lint
+.cursor
+.qodo
+.task
+layoutrefactor

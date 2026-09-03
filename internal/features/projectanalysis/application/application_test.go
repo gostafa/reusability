@@ -39,7 +39,7 @@ func (coverageSource) Load(
 
 func TestAssembleResultWorkerError(t *testing.T) {
 	sentinel := errors.New("workers failed")
-	pipeline := newPipeline(
+	pipeline := pipelineWithWorkers(
 		typefacts.NewService(coverageSource{}),
 		func(context.Context, workerpool.RunConfig) error {
 			return sentinel

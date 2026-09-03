@@ -79,25 +79,26 @@ func buildScanResult(pkg *packageInfo, prod, test []string) (*prodScanResult, er
 		return nil, fmt.Errorf("parse prod decls: %w", err)
 	}
 
-	return newProdScanResult(pkg, fset, doc, prod, test, decls), nil
+	return newProdScanResult(&prodScanBuild{
+		pkg:   pkg,
+		fset:  fset,
+		doc:   doc,
+		prod:  prod,
+		test:  test,
+		decls: decls,
+	}), nil
 }
 
-func newProdScanResult(
-	pkg *packageInfo,
-	fset *token.FileSet,
-	doc string,
-	prod, test []string,
-	decls []pkgDecl,
-) *prodScanResult {
+func newProdScanResult(build *prodScanBuild) *prodScanResult {
 	return &prodScanResult{
-		prodFiles:  prod,
-		testFiles:  test,
-		allDecls:   decls,
-		packageDoc: choosePackageDoc(doc, pkg.Name),
-		pkgImports: collectProdImports(fset, pkg.Dir, prod),
+		prodFiles:  build.prod,
+		testFiles:  build.test,
+		allDecls:   build.decls,
+		packageDoc: choosePackageDoc(build.doc, build.pkg.Name),
+		pkgImports: collectProdImports(build.fset, build.pkg.Dir, build.prod),
 		license:    extractLicense(),
-		fset:       fset,
-		pkgName:    pkg.Name,
+		fset:       build.fset,
+		pkgName:    build.pkg.Name,
 	}
 }
 
@@ -114,7 +115,7 @@ func accumulateProdDecls(input *prodParseInput) (decls []pkgDecl, doc string, er
 	state := &prodAccumulateState{}
 
 	for i := range input.prod {
-		err := accumulateOneProd(input, state, input.prod[i])
+		err = accumulateOneProd(input, state, input.prod[i])
 		if err != nil {
 			return nil, emptyString, fmt.Errorf("accumulate one: %w", err)
 		}

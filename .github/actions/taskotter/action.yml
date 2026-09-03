@@ -31,7 +31,7 @@ runs:
       with:
         github-token: ${{ inputs.token }}
         store-version: v0.0.8
-        target-folder: taskfiles
+        target-folder: taskotter
         tasks: ${{ inputs.tasks }}
         js: ${{ inputs.js }}
         fail-on-changes: true
