@@ -1,6 +1,6 @@
 # Reusability
 
-[![LICENSE](https://img.shields.io/github/license/gostafa/singleton)](/LICENSE) [![`Workflow for reusability Action`](https://github.com/gostafa/reusability/actions/workflows/main.yml/badge.svg)](https://github.com/gostafa/reusability/actions/workflows/main.yml) [![codecov](https://codecov.io/gh/gostafa/reusability/graph/badge.svg)](https://codecov.io/gh/gostafa/reusability) ![Go Reference](https://pkg.go.dev/badge/github.com/gostafa/reusability)](https://pkg.go.dev/github.com/gostafa/reusability)
+[![LICENSE](https://img.shields.io/github/license/gostafa/singleton)](/LICENSE) [![`Workflow for reusability Action`](https://github.com/gostafa/reusability/actions/workflows/main.yml/badge.svg)](https://github.com/gostafa/reusability/actions/workflows/main.yml) [![codecov](https://codecov.io/gh/gostafa/reusability/graph/badge.svg)](https://codecov.io/gh/gostafa/reusability) [![Go Reference](https://pkg.go.dev/badge/github.com/gostafa/reusability)](https://pkg.go.dev/github.com/gostafa/reusability)
 
 `reusability` analyzes Go named types and reports the **reusability index** per
 type. Reports show only package path, type name, and reusability — no structural
