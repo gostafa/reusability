@@ -1,5 +1,6 @@
 ---
 version: '2'
+
 linters:
   default: all
   disable:
@@ -9,9 +10,21 @@ linters:
     - testpackage
     - godot
     - exhaustruct
-  enable: [reusability, distance]
+  enable:
+    - reusability
+    - distance
+    - vulner
+    - coverlint
   settings:
     custom:
+      coverlint:
+        type: module
+        settings:
+          rules:
+            - pattern: '**'
+              min: 1.0
+          test-result-path: ./test-result.txt
+          coverage-result-path: ./coverage.out
       distance:
         type: module
         description: Enforce Go main-sequence distance policy thresholds
@@ -31,8 +44,11 @@ linters:
           rules:
             - pattern: '**'
               min: 0.80
-            - pattern: '**/*_test'
-              min: 0.0
+            # - pattern: '**/*_test'
+            #   min: 0.0
+      vulner:
+        type: module
+        description: Report reachable Go vulnerabilities
     asasalint:
       exclude: []
       use-builtin-exclusions: false
@@ -54,7 +70,11 @@ linters:
       max-complexity: 5
       package-average: 3.0
     decorder:
-      dec-order: [type, const, var, func]
+      dec-order:
+        - type
+        - const
+        - var
+        - func
       ignore-underscore-vars: false
       disable-dec-order-check: false
       disable-init-func-first-check: false
@@ -65,7 +85,9 @@ linters:
     depguard:
       rules:
         production:
-          files: [$all, '!$test']
+          files:
+            - $all
+            - '!$test'
           list-mode: lax
           deny:
             - pkg: io/ioutil$
@@ -73,7 +95,8 @@ linters:
             - pkg: gopkg.in/yaml.v3
               desc: Use go.yaml.in/yaml/v3 packages
         tests:
-          files: [$test]
+          files:
+            - $test
           list-mode: lax
           deny:
             - pkg: io/ioutil$
@@ -85,9 +108,7 @@ linters:
     dupword:
       keywords: []
       ignore: []
-      comments-only: false
     embeddedstructfieldcheck:
-      empty-line: true
       forbid-mutex: true
     errcheck:
       check-type-assertions: true
@@ -106,7 +127,9 @@ linters:
       allowed-errors: []
       allowed-errors-wildcard: []
     exhaustive:
-      check: [switch, map]
+      check:
+        - switch
+        - map
       default-signifies-exhaustive: false
       ignore-enum-members: a^
       ignore-enum-types: a^
@@ -115,12 +138,9 @@ linters:
       explicit-exhaustive-map: false
       default-case-required: true
     exhaustruct:
-      include: [.*]
+      include:
+        - .*
       exclude: []
-      allow-empty: false
-      allow-empty-rx: []
-      allow-empty-returns: false
-      allow-empty-declarations: false
     fatcontext:
       check-struct-pointers: true
     forbidigo:
@@ -139,7 +159,6 @@ linters:
       constructor: true
       struct-method: true
       alphabetical: true
-      function: true
     funlen:
       lines: 20
       statements: 10
@@ -157,8 +176,6 @@ linters:
       validate-async-intervals: true
       forbid-spec-pollution: true
       force-succeed: true
-      force-assertion-description: true
-      force-tonot: true
     gochecksumtype:
       default-signifies-exhaustive: false
       include-shared-interfaces: true
@@ -199,23 +216,22 @@ linters:
           skipRecvDeref: false
     gocyclo:
       min-complexity: 5
-    godoclint:
-      default: all
-      options:
-        require-doc:
-          ignore-exported: false
-          ignore-unexported: true
-        start-with-name:
-          include-unexported: false
-        max-len:
-          length: 127
     godot:
       scope: all
-      exclude: ['^SPDX-License-Identifier:', ^Taskotter]
+      exclude:
+        - '^SPDX-License-Identifier:'
+        - ^Taskotter
       period: true
       capital: true
     godox:
-      keywords: [TODO, BUG, FIXME, HACK, XXX, OPTIMIZE, NOTE]
+      keywords:
+        - TODO
+        - BUG
+        - FIXME
+        - HACK
+        - XXX
+        - OPTIMIZE
+        - NOTE
     goheader:
       values:
         const:
@@ -233,22 +249,7 @@ linters:
       toolchain-pattern: a^
       tool-forbidden: true
       go-debug-forbidden: true
-      go-version-pattern: ^1\.26(\.0)?$
-      check-module-path: true
-    gomodguard_v2:
-      local-replace-directives: true
-      allowed:
-        - module: github.com/gostafa
-          match-type: prefix
-        - module: github.com/task-otter
-          match-type: prefix
-        - module: go.yaml.in
-          match-type: prefix
-        - module: golang.org
-          match-type: prefix
-        - module: github.com/golangci
-          match-type: prefix
-      blocked: []
+      go-version-pattern: ^1\.27\.2$
     gosec:
       includes: []
       excludes: []
@@ -298,7 +299,10 @@ linters:
       var-require-single-var: true
       var-require-grouping: false
     iface:
-      enable: [identical, opaque, unexported]
+      enable:
+        - identical
+        - opaque
+        - unexported
     importas:
       no-unaliased: true
       no-extra-aliases: false
@@ -307,14 +311,12 @@ linters:
           alias: yaml
     inamedparam:
       skip-single-param: false
-    ineffassign:
-      check-escaping-errors: true
     interfacebloat:
       max: 5
-    iotamixing:
-      report-individual: true
     ireturn:
-      allow: [error]
+      allow:
+        - error
+        - generic
     lll:
       line-length: 120
       tab-width: 2
@@ -337,7 +339,13 @@ linters:
       extra-words: []
       mode: default
     mnd:
-      checks: [argument, case, condition, operation, return, assign]
+      checks:
+        - argument
+        - case
+        - condition
+        - operation
+        - return
+        - assign
       ignored-numbers: []
       ignored-files: []
       ignored-functions: []
@@ -372,7 +380,6 @@ linters:
     paralleltest:
       ignore-missing: false
       ignore-missing-subtests: false
-      check-cleanup: true
     perfsprint:
       integer-format: true
       int-conversion: true
@@ -384,8 +391,6 @@ linters:
       strconcat: true
       bool-format: true
       hex-format: true
-      concat-loop: true
-      loop-other-ops: true
     prealloc:
       simple: false
       range-loops: true
@@ -402,7 +407,8 @@ linters:
       skip-any-generated: false
       replace-first-arg-in-append: true
     reassign:
-      patterns: [.*]
+      patterns:
+        - .*
     recvcheck:
       disable-builtin: true
       exclusions: []
@@ -410,7 +416,6 @@ linters:
       max-open-files: 2048
       severity: error
       enable-all-rules: true
-      enable-default-rules: true
       directives:
         - name: specify-disable-reason
           severity: error
@@ -419,23 +424,29 @@ linters:
         - name: argument-limit
           severity: error
           disabled: false
-          arguments: [3]
+          arguments:
+            - 3
         - name: cognitive-complexity
           severity: error
           disabled: false
-          arguments: [5]
+          arguments:
+            - 5
         - name: cyclomatic
           severity: error
           disabled: false
-          arguments: [5]
+          arguments:
+            - 5
         - name: function-length
           severity: error
           disabled: false
-          arguments: [10, 0]
+          arguments:
+            - 10
+            - 0
         - name: line-length-limit
           severity: error
           disabled: false
-          arguments: [120]
+          arguments:
+            - 120
     rowserrcheck:
       packages: []
     sloglint:
@@ -448,12 +459,17 @@ linters:
       attr-only: true
       args-on-sep-lines: true
       no-raw-keys: true
-      allowed-keys: []
-      forbidden-keys: [time, level, msg, source]
+      forbidden-keys:
+        - time
+        - level
+        - msg
+        - source
       key-naming-case: snake
-      custom-funcs: []
     spancheck:
-      checks: [end, record-error, set-status]
+      checks:
+        - end
+        - record-error
+        - set-status
       ignore-check-signatures: []
       extra-start-span-signatures: []
     staticcheck:
@@ -502,7 +518,8 @@ linters:
         - DB
         - TS
       http-status-code-whitelist: []
-      checks: [all]
+      checks:
+        - all
     tagalign:
       align: true
       sort: true
@@ -573,29 +590,6 @@ linters:
       safe: false
     unparam:
       check-exported: true
-    unqueryvet:
-      check-sql-builders: true
-      check-aliased-wildcard: true
-      check-string-concat: true
-      check-format-strings: true
-      check-string-builder: true
-      check-subqueries: true
-      check-n1: true
-      check-sql-injection: true
-      check-tx-leaks: true
-      allowed-patterns: []
-      allow: []
-      ignored-functions: []
-      sql-builders:
-        squirrel: true
-        gorm: true
-        sqlx: true
-        ent: true
-        pgx: true
-        bun: true
-        sqlboiler: true
-        jet: true
-      custom-rules: []
     unused:
       field-writes-are-uses: false
       post-statements-are-reads: false
@@ -632,7 +626,15 @@ linters:
       ignore-type-assert-ok: false
       ignore-map-index-ok: false
       ignore-chan-recv-ok: false
-      ignore-names: [id, ok, idx, db, err, dir, t, i]
+      ignore-names:
+        - id
+        - ok
+        - idx
+        - db
+        - err
+        - dir
+        - t
+        - i
       ignore-decls: []
     whitespace:
       multi-if: true
@@ -649,7 +651,6 @@ linters:
       allow-whole-block: false
       branch-max-lines: 0
       case-max-lines: 0
-      cuddle-max-statements: 0
       default: all
       enable:
         - append
@@ -672,25 +673,22 @@ linters:
         - type-switch
         - leading-whitespace
         - trailing-whitespace
-        - after-block
-        - after-decl
-        - after-defer
-        - after-expr
-        - after-go
         - assign-exclusive
         - assign-expr
-        - cuddle-group
       disable: []
   exclusions:
-    paths: [.*_test.go]
+    paths:
+      - .*_test.go
     generated: disable
     warn-unused: true
+
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
   uniq-by-line: false
   new: false
   fix: false
+
 output:
   formats:
     text:
@@ -700,8 +698,12 @@ output:
       colors: true
   path-prefix: ''
   path-mode: ''
-  sort-order: [severity, linter, file]
+  sort-order:
+    - severity
+    - linter
+    - file
   show-stats: true
+
 run:
   timeout: '0'
   relative-path-mode: gomod
@@ -709,13 +711,20 @@ run:
   tests: true
   build-tags: []
   modules-download-mode: readonly
-  enable-build-vcs: true
   allow-parallel-runners: false
   allow-serial-runners: false
-  go: '1.26'
+  go: 1.27.2
   concurrency: 0
+
 severity:
   default: error
   rules: []
+
 formatters:
-  enable: [gci, gofmt, gofumpt, goimports, golines, swaggo]
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+    - golines
+    - swaggo

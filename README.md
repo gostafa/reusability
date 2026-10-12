@@ -1,5 +1,9 @@
 # reusability
 
+
+[![`Workflow for reusability Action`](https://github.com/gostafa/reusability/actions/workflows/main.yml/badge.svg)](https://github.com/gostafa/reusability/actions/workflows/main.yml)
+[![codecov](https://codecov.io/gh/gostafa/reusability/graph/badge.svg)](https://codecov.io/gh/gostafa/reusability)
+
 `reusability` analyzes Go named types and reports the **reusability index** per
 type. Reports show only package path, type name, and reusability — no structural
 metadata (fields, methods, coupling counts, etc.).
