@@ -2,7 +2,10 @@
 name: CI
 
 on:
-  push: null
+  push:
+    branches:
+      - main
+  pull_request: null
   workflow_dispatch: null
 
 concurrency:
