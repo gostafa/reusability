@@ -1,11 +1,10 @@
 // Gostafa 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+// Package application provides reusable analysis utilities.
 package application
 
-import (
-	"github.com/gostafa/reusability/internal/shared/metrics"
-)
+import "github.com/gostafa/reusability/internal/shared/metrics"
 
 type (
 	// Result is the cohesion metrics for one named type.

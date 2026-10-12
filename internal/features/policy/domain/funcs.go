@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gostafa/reusability/reusability"
+	"github.com/gostafa/reusability"
 )
 
 // DefaultRules returns the recommended baseline when no rules are configured
@@ -258,7 +258,6 @@ func moreSpecific(candidate, current string) bool {
 		return candidateWildcards < currentWildcards
 	}
 
-	// A longer pattern is more constrained. Equality deliberately returns true
 	// so later rules override earlier rules with the same specificity.
 	return candidateSegments >= currentSegments
 }

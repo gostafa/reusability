@@ -3,8 +3,6 @@
 
 package domain
 
-import (
-	"errors"
-)
+import "errors"
 
 var errShortWrite = errors.New("short write")

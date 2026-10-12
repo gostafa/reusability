@@ -3,9 +3,7 @@
 
 package analyzer
 
-import (
-	"errors"
-)
+import "errors"
 
 var (
 	errRuleMinRequired        = errors.New("min is required")

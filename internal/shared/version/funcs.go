@@ -3,9 +3,7 @@
 
 package version
 
-import (
-	"runtime/debug"
-)
+import "runtime/debug"
 
 // Version returns the module version from build info, or "dev" for local builds.
 func Version() string {

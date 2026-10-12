@@ -16,9 +16,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gostafa/reusability"
 	policydomain "github.com/gostafa/reusability/internal/features/policy/domain"
 	"github.com/gostafa/reusability/internal/shared/metrics"
-	"github.com/gostafa/reusability/reusability"
 	"golang.org/x/tools/go/analysis"
 )
 
@@ -238,7 +238,6 @@ func computeViolations(
 	settings *Settings,
 	analyzer reportAnalyzer,
 ) (map[string][]policydomain.Violation, error) {
-	// Load rules, run analysis once, then group violations by package path.
 	rules, err := settingsRules(settings)
 	if err != nil {
 		return nil, fmt.Errorf("reusability policy: %w", err)

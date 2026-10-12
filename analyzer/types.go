@@ -1,14 +1,15 @@
 // Gostafa 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+// Package analyzer provides the go/analysis driver for reusability linting.
 package analyzer
 
 import (
 	"context"
 	"sync"
 
+	"github.com/gostafa/reusability"
 	policydomain "github.com/gostafa/reusability/internal/features/policy/domain"
-	"github.com/gostafa/reusability/reusability"
 )
 
 type (

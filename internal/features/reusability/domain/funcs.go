@@ -10,10 +10,6 @@ import (
 	"github.com/gostafa/reusability/internal/shared/metrics"
 )
 
-const (
-	zero = 0
-)
-
 // Compute derives AMC and LCOM from type facts, derives CBO from referenced
 // types, assembles the four components (dropping the not-applicable ones),
 // and evaluates the index with renormalized weights. fieldUsage is

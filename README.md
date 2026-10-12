@@ -16,6 +16,10 @@ It can run as:
 * a standalone CLI;
 * a plugin inside a custom `golangci-lint` binary.
 
+Go callers import `github.com/gostafa/reusability` and use `Analyze` with
+`Config` to obtain a `Report`. `ErrConfig` and `ErrAnalysis` identify failures
+with `errors.Is`.
+
 ## Use as a CLI
 
 ### Install

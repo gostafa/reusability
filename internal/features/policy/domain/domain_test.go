@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gostafa/reusability"
 	"github.com/gostafa/reusability/internal/shared/metrics"
-	"github.com/gostafa/reusability/reusability"
 )
 
 func TestEvaluateSkipsInapplicableTypeMetric(t *testing.T) {

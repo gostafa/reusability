@@ -1,11 +1,10 @@
 // Gostafa 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+// Package domain provides reusable analysis utilities.
 package domain
 
-import (
-	"github.com/gostafa/reusability/internal/shared/metrics"
-)
+import "github.com/gostafa/reusability/internal/shared/metrics"
 
 type (
 	// Result holds CBO and the reusability index for one type.

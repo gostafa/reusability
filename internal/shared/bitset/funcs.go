@@ -3,9 +3,7 @@
 
 package bitset
 
-import (
-	"math/bits"
-)
+import "math/bits"
 
 // Clone returns an independent copy of fieldSet.
 func Clone(fieldSet FieldSet) FieldSet {

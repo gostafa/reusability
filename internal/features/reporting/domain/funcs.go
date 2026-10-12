@@ -10,8 +10,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/gostafa/reusability"
 	"github.com/gostafa/reusability/internal/shared/metrics"
-	"github.com/gostafa/reusability/reusability"
 )
 
 // CSVHeader is the fixed CSV column set.
@@ -839,7 +839,6 @@ func reusabilityCell(
 	typeCols []string,
 	stats map[string]*columnStats,
 ) []tableCell {
-	// Continue.
 	cells := make([]tableCell, indexZero, len(typeCols))
 
 	for i := range typeCols {
@@ -854,7 +853,6 @@ func oneReusabilityCell(
 	name string,
 	stats map[string]*columnStats,
 ) tableCell {
-	// Continue.
 	if name != metrics.MetricReusability || !result.Applicable {
 		return naTableCell()
 	}

@@ -14,10 +14,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gostafa/reusability"
 	"github.com/gostafa/reusability/internal/features/reporting/domain"
 	"github.com/gostafa/reusability/internal/features/reporting/ports/outbound"
 	"github.com/gostafa/reusability/internal/shared/metrics"
-	"github.com/gostafa/reusability/reusability"
 )
 
 type trackingWriteCloser struct {

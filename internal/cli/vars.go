@@ -3,9 +3,7 @@
 
 package cli
 
-import (
-	"errors"
-)
+import "errors"
 
 var (
 	errEmptyPattern       = errors.New("empty pattern in rule spec")

@@ -1,14 +1,15 @@
 // Gostafa 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+// Package application renders reusability reports in multiple formats.
 package application
 
 import (
 	"io"
 
+	"github.com/gostafa/reusability"
 	"github.com/gostafa/reusability/internal/features/reporting/domain"
 	"github.com/gostafa/reusability/internal/features/reporting/ports/outbound"
-	"github.com/gostafa/reusability/reusability"
 )
 
 type (

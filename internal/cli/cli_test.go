@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gostafa/reusability"
 	policydomain "github.com/gostafa/reusability/internal/features/policy/domain"
 	"github.com/gostafa/reusability/internal/shared/metrics"
-	"github.com/gostafa/reusability/reusability"
 )
 
 func TestRuleParsing(t *testing.T) {

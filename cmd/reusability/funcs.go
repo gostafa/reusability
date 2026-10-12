@@ -5,8 +5,6 @@ package main
 
 import (
 	"os"
-
-	"github.com/gostafa/reusability/internal/cli"
 )
 
 func main() {
@@ -14,7 +12,7 @@ func main() {
 }
 
 func defaultRuntime() mainRuntime {
-	return mainRuntime{run: cli.Run, exit: os.Exit}
+	return mainRuntime{run: run, exit: exit}
 }
 
 func (runtime mainRuntime) start(args []string) {

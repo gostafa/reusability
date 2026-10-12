@@ -9,10 +9,6 @@ import (
 	"github.com/gostafa/reusability/internal/shared/metrics"
 )
 
-const (
-	zero = 0
-)
-
 // ComputeForType evaluates cyclomatic complexity for every method of the
 // type and derives AMC.
 func ComputeForType(t *typefacts.TypeFacts) Result {

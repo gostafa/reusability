@@ -17,16 +17,16 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gostafa/reusability"
+	"github.com/gostafa/reusability/internal/cli/adapters/profiling"
 	policydomain "github.com/gostafa/reusability/internal/features/policy/domain"
+	"github.com/gostafa/reusability/internal/features/reporting/adapters/browser"
+	"github.com/gostafa/reusability/internal/features/reporting/adapters/sinks"
 	reporting "github.com/gostafa/reusability/internal/features/reporting/application"
 	reportingdomain "github.com/gostafa/reusability/internal/features/reporting/domain"
 	"github.com/gostafa/reusability/internal/features/reporting/ports/outbound"
-	"github.com/gostafa/reusability/internal/infrastructure/browser"
-	"github.com/gostafa/reusability/internal/infrastructure/profiling"
-	"github.com/gostafa/reusability/internal/infrastructure/sinks"
 	"github.com/gostafa/reusability/internal/shared/metrics"
 	"github.com/gostafa/reusability/internal/shared/version"
-	"github.com/gostafa/reusability/reusability"
 )
 
 // Run executes reusability with args and returns its process exit code.
@@ -650,7 +650,8 @@ func resolveWeights(vals *flagValues, logger *slog.Logger) weightsResult {
 		Documentation: *vals.reusabilityWeightDocumentation,
 	}
 
-	err := weights.Validate()
+	internalWeights := metrics.ReusabilityWeights(weights)
+	err := internalWeights.Validate()
 	if err != nil {
 		logger.ErrorContext(
 			context.Background(),

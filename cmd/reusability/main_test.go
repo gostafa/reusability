@@ -4,6 +4,7 @@
 package main
 
 import (
+	"os"
 	"testing"
 )
 
@@ -38,4 +39,16 @@ func TestMainDelegatesToCLI(t *testing.T) {
 	if gotCode != testSeven {
 		t.Fatalf("exit code = %d, want %d", gotCode, testSeven)
 	}
+}
+
+func TestMainRunsCLI(t *testing.T) {
+	oldExit, oldArgs := exit, os.Args
+	t.Cleanup(func() { exit, os.Args = oldExit, oldArgs })
+	exit = func(code int) {
+		if code != testZero {
+			t.Fatalf("exit = %d", code)
+		}
+	}
+	os.Args = []string{"reusability", flagVersion}
+	main()
 }

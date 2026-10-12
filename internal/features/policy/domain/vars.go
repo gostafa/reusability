@@ -3,9 +3,7 @@
 
 package domain
 
-import (
-	"errors"
-)
+import "errors"
 
 var (
 	errNotFinite     = errors.New("must be a finite number")

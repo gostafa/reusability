@@ -10,19 +10,6 @@ import (
 	"strings"
 )
 
-type (
-	metricSpec = struct {
-		name       string
-		scope      MetricScope
-		definition string
-	}
-
-	weightedComponent = struct {
-		component ReusabilityComponent
-		weight    float64
-	}
-)
-
 // AMC computes Average Method Complexity for a type:
 //
 //	AMC = Σ(method complexities) / methodCount

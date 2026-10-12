@@ -1,6 +1,7 @@
 // Gostafa 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+// Package cli implements the reusability command-line interface.
 package cli
 
 import (
@@ -8,7 +9,7 @@ import (
 	"flag"
 	"log/slog"
 
-	"github.com/gostafa/reusability/reusability"
+	"github.com/gostafa/reusability"
 )
 
 type (

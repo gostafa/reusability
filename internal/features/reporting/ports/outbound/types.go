@@ -1,11 +1,10 @@
 // Gostafa 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+// Package outbound defines report output sinks.
 package outbound
 
-import (
-	"io"
-)
+import "io"
 
 type (
 	// Sink opens a concrete stream for rendered report bytes.

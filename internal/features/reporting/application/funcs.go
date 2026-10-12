@@ -10,9 +10,9 @@ import (
 	"io"
 	"strings"
 
+	"github.com/gostafa/reusability"
 	"github.com/gostafa/reusability/internal/features/reporting/domain"
 	"github.com/gostafa/reusability/internal/features/reporting/ports/outbound"
-	"github.com/gostafa/reusability/reusability"
 )
 
 // Write renders the report in the given format into the sink. Options are
@@ -292,7 +292,6 @@ func renderWebWith(
 	report *reusability.Report,
 	marshal func(any) ([]byte, error),
 ) error {
-	// Continue.
 	page, err := buildWebPageWith(report, marshal)
 	if err != nil {
 		return fmt.Errorf("build web page: %w", err)
@@ -310,7 +309,6 @@ func buildWebPageWith(
 	report *reusability.Report,
 	marshal func(any) ([]byte, error),
 ) (string, error) {
-	// Continue.
 	payload, err := marshalWebReport(report, marshal)
 	if err != nil {
 		return emptyString, fmt.Errorf("marshal web report: %w", err)
@@ -333,7 +331,6 @@ func marshalWebReport(
 	report *reusability.Report,
 	marshal func(any) ([]byte, error),
 ) ([]byte, error) {
-	// Continue.
 	payload, err := marshal(webPayload{
 		Module: report.Module,
 		Report: buildJSONReport(report),
