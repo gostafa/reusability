@@ -4,7 +4,7 @@
 
 * Use ports and adapters architecture, organized by feature. Keep each feature's domain rules, application use cases, ports, and adapters together under `internal/`; reuse the existing layers when extending a feature.
 * Keep domain logic independent of adapters and third-party libraries. Application code depends on domain contracts and ports; adapters implement those ports. Wire concrete adapters at the composition boundary.
-* Keep the root `vulner` package as the public facade. Put implementation details in `internal/` and expose only the contracts consumers need.
+* Keep the root `reusability` package as the public facade. Put implementation details in `internal/` and expose only the contracts consumers need.
 
 ## Go Package Files
 
@@ -48,11 +48,11 @@ Prefer lean-ctx for repository work: `ctx_read` for file reads, `ctx_search` for
 
 * Fix distance, reusability, and coverlint by refactor (coverlint-style DTO type aliases and interfaces in stable packages); do not add `//nolint` or edit `.golangci.yml` to pass.
 * Keep README aligned with the coverlint sibling linter README (badges, CLI vs plugin, custom golangci-lint).
-* Register and document the golangci-lint plugin as `github.com/gostafa/vulner/plugin`, not the module root.
+* Register and document the golangci-lint plugin as `github.com/gostafa/reusability/plugin`, not the module root.
 
 ## Learned Workspace Facts
 
-* Module path is `github.com/gostafa/vulner`; the plugin package is `github.com/gostafa/vulner/plugin`.
-* Coverlint requires 100% coverage including `cmd/vulner`; use the coverlint testable-main pattern (injectable `run`/`exit`, tests that exercise `main` without `os.Exit`).
+* Module path is `github.com/gostafa/reusability`; the plugin package is `github.com/gostafa/reusability/plugin`.
+* Coverlint requires 100% coverage including `cmd/reusability`; use the coverlint testable-main pattern (injectable `run`/`exit`, tests that exercise `main` without `os.Exit`).
 * Distance max is 0.30 and reusability min is 0.80; represent DTOs as `type T = struct{...}` aliases so they are not scored as named types.
-* Local CI is `task taskotter:ci` / `task taskotter:ci:fix` via Taskotter custom golangci-lint (coverlint, distance, reusability, and vulner).
+* Local CI is `task taskotter:ci` / `task taskotter:ci:fix` via Taskotter custom golangci-lint (coverlint, distance, reusability, and reusability).
