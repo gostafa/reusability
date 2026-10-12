@@ -37,6 +37,22 @@ func defaultPluginSettings() map[string]any {
 	}
 }
 
+func TestRegisteredPluginFactory(t *testing.T) {
+	plugins, err := register.GetPlugin(analyzer.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := plugins(defaultPluginSettings()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := plugins(map[string]any{"unknown": true}); err == nil {
+		t.Fatal("unknown setting accepted")
+	}
+	if _, err := New(make(chan int)); err == nil {
+		t.Fatal("unsupported settings accepted")
+	}
+}
+
 func assertBuiltAnalyzer(t *testing.T, p register.LinterPlugin) {
 	t.Helper()
 

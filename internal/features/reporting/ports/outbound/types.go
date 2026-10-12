@@ -4,7 +4,9 @@
 // Package outbound defines report output sinks.
 package outbound
 
-import "io"
+import (
+	"io"
+)
 
 type (
 	// Sink opens a concrete stream for rendered report bytes.

@@ -5,12 +5,13 @@
 package domain
 
 import (
-	"strings"
+	"io"
 
 	"github.com/gostafa/reusability"
 )
 
 type (
+	textOutput func(string) (int, error)
 	// DocScope classifies a metric guide entry's applicability.
 	DocScope string
 
@@ -124,7 +125,7 @@ type (
 	}
 
 	rowWriteArgs = struct {
-		builder *strings.Builder
+		builder io.StringWriter
 		row     []tableCell
 		widths  []int
 		color   bool
@@ -132,7 +133,7 @@ type (
 	}
 
 	textTailInput = struct {
-		builder *strings.Builder
+		builder io.StringWriter
 		report  *reusability.Report
 		opts    TextOptions
 		sawNA   bool
@@ -165,14 +166,14 @@ type (
 	}
 
 	notesBodyArgs = struct {
-		builder *strings.Builder
+		builder io.StringWriter
 		path    string
 		notes   []string
 		color   bool
 	}
 
 	notesWriter = struct {
-		builder *strings.Builder
+		builder io.StringWriter
 		color   bool
 		wrote   bool
 	}

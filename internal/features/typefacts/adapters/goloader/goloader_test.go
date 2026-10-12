@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
+	"go/parser"
 	"go/token"
 	"go/types"
 	"os"
@@ -291,6 +292,62 @@ func TestExtractAllWorkerError(t *testing.T) {
 func TestWalkBodyNilBody(t *testing.T) {
 	var facts domain.MethodFacts
 	walkBody(&walkBodyRequest{decl: &ast.FuncDecl{}, facts: &facts})
+}
+
+func TestInvalidPositionsAndPrivateDocs(t *testing.T) {
+	t.Parallel()
+	if lineCount(token.NewFileSet(), token.NoPos, token.NoPos) != 0 {
+		t.Fatal("invalid positions must have zero lines")
+	}
+	if exp, doc := countTypeDocs(
+		nil,
+		types.NewTypeName(token.NoPos, nil, "private", nil),
+	); exp != 0 ||
+		doc != 0 {
+		t.Fatalf("private docs = %d/%d", exp, doc)
+	}
+	if relativePositionFile("", "file.go") != "file.go" ||
+		relativePositionFile("/root", "/outside/file.go") != "/outside/file.go" {
+		t.Fatal("outside paths must remain intact")
+	}
+}
+
+func TestSelectionGuards(t *testing.T) {
+	t.Parallel()
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(
+		fset,
+		"p.go",
+		"package p; type T struct { X int }; func (t T) M() { t.M(); _ = T.M; _ = t.X }",
+		0,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info := &types.Info{Selections: make(map[*ast.SelectorExpr]*types.Selection)}
+	var config types.Config
+	if _, err := config.Check("p", fset, []*ast.File{file}, info); err != nil {
+		t.Fatal(err)
+	}
+	for _, selection := range info.Selections {
+		switch selection.Kind() {
+		case types.MethodExpr:
+			recordSelectionKind(selection, nil)
+		case types.MethodVal:
+			recordFieldUse(selection, nil)
+			fn := selection.Obj().(*types.Func)
+			recordSiblingCall(
+				selection,
+				&selectionRequest{
+					methodIndex: map[*types.Func]int{fn: 0},
+					excludeSelf: true,
+					selfIdx:     0,
+				},
+			)
+		case types.FieldVal:
+			recordSiblingCall(selection, nil)
+		}
+	}
 }
 
 func TestIndexTypeDeclSkipsNonTypeSpec(t *testing.T) {

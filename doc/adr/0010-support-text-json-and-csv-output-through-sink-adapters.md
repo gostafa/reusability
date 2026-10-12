@@ -1,4 +1,4 @@
-# 10. Support text, JSON, and CSV output through sink adapters
+# 10. Support Text, JSON, and CSV Output Through Sink Adapters
 
 Date: 2026-07-11
 

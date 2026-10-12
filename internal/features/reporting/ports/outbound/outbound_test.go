@@ -5,11 +5,37 @@ package outbound
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"testing"
 )
 
 type nopWriteCloser struct{ io.Writer }
+
+type failedWriteCloser struct{ err error }
+
+func (writer failedWriteCloser) Write([]byte) (int, error) { return 0, writer.err }
+func (writer failedWriteCloser) Close() error              { return writer.err }
+
+func TestStreamPropagatesFailures(t *testing.T) {
+	t.Parallel()
+	sentinel := errors.New("sink failure")
+	if _, err := Open(
+		NewSink(func() (*Stream, error) { return nil, sentinel }),
+	); !errors.Is(
+		err,
+		sentinel,
+	) {
+		t.Fatalf("open = %v", err)
+	}
+	stream := NewStream(failedWriteCloser{sentinel})
+	if _, err := stream.Write([]byte("report")); !errors.Is(err, sentinel) {
+		t.Fatalf("write = %v", err)
+	}
+	if err := stream.Close(); !errors.Is(err, sentinel) {
+		t.Fatalf("close = %v", err)
+	}
+}
 
 func (nopWriteCloser) Close() error { return nil }
 

@@ -4,7 +4,9 @@
 // Package plugin adapts the reusability analyzer to golangci-lint.
 package plugin
 
-import "golang.org/x/tools/go/analysis"
+import (
+	"golang.org/x/tools/go/analysis"
+)
 
 type (
 	// Plugin is the golangci-lint module plugin for reusability.

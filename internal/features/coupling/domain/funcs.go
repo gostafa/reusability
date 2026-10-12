@@ -27,7 +27,7 @@ func BuildDependencyGraph(facts *typefacts.ProjectFacts, scope Scope) Dependency
 			path     string
 			pkgID    int
 		}{
-			graph: &graph, facts: facts, analyzed: analyzed, scope: scope, pkgID: index,
+			graph: &graph, facts: facts, analyzed: analyzed, scope: scope, pkgID: index, path: "",
 		})
 	}
 

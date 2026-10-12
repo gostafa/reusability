@@ -1,4 +1,4 @@
-# 14. Use adrs to manage architecture decision records
+# 14. Use Adrs to Manage Architecture Decision Records
 
 Date: 2026-07-11
 

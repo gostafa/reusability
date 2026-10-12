@@ -126,6 +126,16 @@ func TestNameSet(t *testing.T) {
 	}
 }
 
+func TestTransitiveAndMissingCalculator(t *testing.T) {
+	t.Parallel()
+	if fieldUsageMode(&inbound.Options{FieldUsageTransitive: true}) != fieldUsageTransitive {
+		t.Fatal("transitive mode lost")
+	}
+	if got := typeReusability(nil, &tfdomain.TypeFacts{}, fieldUsageDirect); got.Applicable {
+		t.Fatalf("missing calculator = %+v", got)
+	}
+}
+
 type errSource struct{ err error }
 
 func (e errSource) Load(

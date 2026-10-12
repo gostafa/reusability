@@ -6,6 +6,10 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"flag"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,6 +34,150 @@ func TestRuleParsing(t *testing.T) {
 			t.Errorf("appendRule(%q) succeeded, want error", value)
 		}
 	}
+}
+
+type partialWriter struct{}
+
+func (partialWriter) Write(payload []byte) (int, error) { return len(payload) - 1, nil }
+
+type closeOnWrite struct{ file *os.File }
+
+func (writer closeOnWrite) Write(payload []byte) (int, error) {
+	_ = writer.file.Close()
+	return len(payload), nil
+}
+
+func TestCLIErrorAndProfilePaths(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	cfg := runtimeConfig{logger: logger, output: t.TempDir(), format: "text"}
+	if failAnalyze(t.Context(), logger, context.Canceled) != exitInterrupted {
+		t.Fatal("cancel code changed")
+	}
+	if resolveOutputPath("", "web") != defaultWebReportName {
+		t.Fatal("default web destination changed")
+	}
+	if code := writeAndGate(t.Context(), &cfg, &reusability.Report{}); code != exitFail {
+		t.Fatalf("write to directory = %d", code)
+	}
+	cfg.memoryProfile = filepath.Join(t.TempDir(), "missing", "heap.prof")
+	if code := analyzeThenWrite(
+		t.Context(),
+		&cfg,
+		func(context.Context, *reusability.Config) (reusability.Report, error) {
+			return reusability.Report{}, nil
+		},
+	); code != exitFail {
+		t.Fatalf("heap failure = %d", code)
+	}
+	if code := executeWithAnalyze(
+		[]string{
+			"--cpu-profile=" + filepath.Join(t.TempDir(), "cpu.prof"),
+			"--memory-profile=" + filepath.Join(t.TempDir(), "heap.prof"),
+			"--output=" + filepath.Join(t.TempDir(), "report.txt"),
+		},
+		func(context.Context, *reusability.Config) (reusability.Report, error) {
+			return reusability.Report{}, nil
+		},
+	); code != exitOK {
+		t.Fatalf("profile run = %d", code)
+	}
+	stopCPUProfile(t.Context(), logger, func() error { return errors.New("stop failed") })
+	if code := Run([]string{"--format=invalid"}); code != exitUsage {
+		t.Fatalf("invalid format = %d", code)
+	}
+	if got := splitList(" a, ,b "); len(got) != 2 || got[0] != "a" || got[1] != "b" {
+		t.Fatalf("split = %v", got)
+	}
+	if !webEqualsTruthy("--web=true") || webEqualsTruthy("--web=invalid") ||
+		wantsWebHelp([]string{"--", "--web"}) {
+		t.Fatal("web boolean parsing changed")
+	}
+	if err := printTo(partialWriter{}, "text"); !errors.Is(err, errShortWrite) {
+		t.Fatalf("short print = %v", err)
+	}
+}
+
+func TestHelpFileFailures(t *testing.T) {
+	file, err := os.CreateTemp(t.TempDir(), "help")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := finalizeHelpDocs(file, file.Name()); err == nil {
+		t.Fatal("closed help file accepted")
+	}
+	file, err = os.CreateTemp(t.TempDir(), "help")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := finalizeHelpDocs(file, t.TempDir()); err == nil {
+		t.Fatal("directory help destination accepted")
+	}
+	sentinel := errors.New("finalize failed")
+	_, err = writeHelpDocsWith(
+		func(_, pattern string) (*os.File, error) { return os.CreateTemp(t.TempDir(), pattern) },
+		func(file *os.File, _ string) (string, error) { _ = file.Close(); return "", sentinel },
+	)
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("finalize = %v", err)
+	}
+}
+
+func TestStdoutAndStderrFailures(t *testing.T) {
+	oldOut, oldErr := os.Stdout, os.Stderr
+	t.Cleanup(func() { os.Stdout, os.Stderr = oldOut, oldErr })
+	file, err := os.CreateTemp(t.TempDir(), "closed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout, os.Stderr = file, file
+	if parseVersion().code != exitFail || stdoutIsTerminal() {
+		t.Fatal("closed stdout accepted")
+	}
+	set := flag.NewFlagSet("usage", flag.ContinueOnError)
+	printUsage(set)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	writeViolations(t.Context(), logger, []policydomain.Violation{{Package: "p", Type: "T"}})
+	if err := printTo(file, "text"); err == nil {
+		t.Fatal("closed writer accepted")
+	}
+	file, err = os.CreateTemp(t.TempDir(), "usage")
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stderr = file
+	set.Bool("option", false, "help")
+	set.SetOutput(closeOnWrite{file})
+	printUsage(set)
+}
+
+func TestBrowserWarningsWithTerminalOutput(t *testing.T) {
+	old := os.Stdout
+	file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = file
+	t.Cleanup(func() { os.Stdout = old; _ = file.Close() })
+	t.Setenv("PATH", t.TempDir())
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	openHelpIfTerminal(logger, "report.html")
+	cfg := runtimeConfig{logger: logger, output: "report.html", webToDefault: true}
+	openWebIfNeeded(t.Context(), &cfg)
+	os.Stdout = old
+	// Redirect to a regular file to exercise the non-terminal branch.
+	regular, err := os.CreateTemp(t.TempDir(), "stdout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer regular.Close()
+	os.Stdout = regular
+	openWebBrowser(t.Context(), &cfg)
 }
 
 func TestResolvePolicyRequiresRules(t *testing.T) {

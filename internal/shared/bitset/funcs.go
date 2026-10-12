@@ -3,7 +3,11 @@
 
 package bitset
 
-import "math/bits"
+import (
+	"math/bits"
+
+	"github.com/gostafa/reusability/internal/shared/zerovalue"
+)
 
 // Clone returns an independent copy of fieldSet.
 func Clone(fieldSet FieldSet) FieldSet {
@@ -13,7 +17,7 @@ func Clone(fieldSet FieldSet) FieldSet {
 // Clone returns an independent copy of the set.
 func (fieldSet FieldSet) Clone() FieldSet {
 	if fieldSet.words == nil {
-		return FieldSet{}
+		return zerovalue.Of[FieldSet]()
 	}
 
 	words := make([]uint64, zero, len(fieldSet.words))
@@ -76,7 +80,7 @@ func Intersects(left, right FieldSet) bool {
 // NewFieldSet returns a FieldSet able to hold size field indices.
 func NewFieldSet(size int) FieldSet {
 	if size <= zero {
-		return FieldSet{}
+		return zerovalue.Of[FieldSet]()
 	}
 
 	return FieldSet{words: make([]uint64, (size+wordBits-one)/wordBits)}
@@ -86,7 +90,7 @@ func NewFieldSet(size int) FieldSet {
 // created for at most 64 fields.
 func Small(fieldSet FieldSet) SmallFieldSet {
 	if len(fieldSet.words) == zero {
-		return SmallFieldSet{}
+		return zerovalue.Of[SmallFieldSet]()
 	}
 
 	return SmallFieldSet{bits: fieldSet.words[zero]}

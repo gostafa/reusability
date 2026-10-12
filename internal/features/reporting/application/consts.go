@@ -3,10 +3,10 @@
 
 package application
 
-import
-
-// embed is required for the //go:embed directives in vars.go.
-_ "embed"
+import (
+	// embed registers the embedded report templates in vars.go.
+	_ "embed"
+)
 
 const (
 	docsDataPlaceholder = "__DOCS_DATA__"

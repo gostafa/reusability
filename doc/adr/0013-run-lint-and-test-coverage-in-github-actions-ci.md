@@ -1,4 +1,4 @@
-# 13. Run lint and test coverage in GitHub Actions CI
+# 13. Run Lint and Test Coverage in GitHub Actions CI
 
 Date: 2026-07-11
 

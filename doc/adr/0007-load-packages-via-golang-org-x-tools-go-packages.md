@@ -1,4 +1,4 @@
-# 7. Load packages via golang.org/x/tools/go/packages
+# 7. Load Packages via Golang.org/x/tools/go/packages
 
 Date: 2026-07-11
 

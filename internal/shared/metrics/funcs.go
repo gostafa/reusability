@@ -61,10 +61,20 @@ func Closure(selected []string) []string {
 // The component is dropped when LCOM is not applicable.
 func CohesionComponent(lcom *MetricResult) ReusabilityComponent {
 	if !lcom.Applicable {
-		return ReusabilityComponent{Name: ComponentCohesion, Reason: lcom.Reason}
+		return ReusabilityComponent{
+			Name:       ComponentCohesion,
+			Reason:     lcom.Reason,
+			Value:      zero,
+			Applicable: false,
+		}
 	}
 
-	return ReusabilityComponent{Name: ComponentCohesion, Value: one - lcom.Value, Applicable: true}
+	return ReusabilityComponent{
+		Name:       ComponentCohesion,
+		Value:      one - lcom.Value,
+		Applicable: true,
+		Reason:     "",
+	}
 }
 
 // CouplingComponent derives the coupling component from a type's CBO using
@@ -77,7 +87,12 @@ func CohesionComponent(lcom *MetricResult) ReusabilityComponent {
 func CouplingComponent(cbo int) ReusabilityComponent {
 	coupling := float64(cbo) / (float64(cbo) + one)
 
-	return ReusabilityComponent{Name: ComponentCoupling, Value: one - coupling, Applicable: true}
+	return ReusabilityComponent{
+		Name:       ComponentCoupling,
+		Value:      one - coupling,
+		Applicable: true,
+		Reason:     "",
+	}
 }
 
 // DefaultReusabilityWeights returns the default component weights.
@@ -98,13 +113,16 @@ func DefaultReusabilityWeights() ReusabilityWeights {
 func DocumentationComponent(documentedExportedMembers, exportedMembers int) ReusabilityComponent {
 	if exportedMembers == zero {
 		return ReusabilityComponent{
-			Name:   ComponentDocumentation,
-			Reason: "type has no exported members",
+			Name:       ComponentDocumentation,
+			Reason:     "type has no exported members",
+			Value:      zero,
+			Applicable: false,
 		}
 	}
 
 	return ReusabilityComponent{
 		Name:       ComponentDocumentation,
+		Reason:     "",
 		Value:      float64(documentedExportedMembers) / float64(exportedMembers),
 		Applicable: true,
 	}
@@ -161,15 +179,19 @@ func Reusability(in *ReusabilityInput) MetricResult {
 	names, details := droppedLabels(dropped)
 	spec := metricSpec{MetricReusability, ScopeType, DefinitionReusability}
 
+	input := &reusabilityResultInput{
+		spec:      spec,
+		inputs:    inputs,
+		weightSum: weightSum,
+		names:     names,
+		dropped:   dropped,
+		details:   details,
+	}
 	if weightSum == zero {
-		return reusabilityUnavailable(&reusabilityResultInput{
-			spec: spec, inputs: inputs, dropped: dropped, details: details,
-		})
+		return reusabilityUnavailable(input)
 	}
 
-	return reusabilityValue(&reusabilityResultInput{
-		spec: spec, inputs: inputs, weightSum: weightSum, names: names,
-	})
+	return reusabilityValue(input)
 }
 
 // Validate reports an error when any weight is negative or when the weights
@@ -229,11 +251,17 @@ func TCC(connectedPairs, methodCount int) MetricResult {
 // AMC is not applicable.
 func TestabilityComponent(amc *MetricResult) ReusabilityComponent {
 	if !amc.Applicable {
-		return ReusabilityComponent{Name: ComponentTestability, Reason: amc.Reason}
+		return ReusabilityComponent{
+			Name:       ComponentTestability,
+			Reason:     amc.Reason,
+			Value:      zero,
+			Applicable: false,
+		}
 	}
 
 	return ReusabilityComponent{
 		Name:       ComponentTestability,
+		Reason:     "",
 		Value:      one / (one + max(zero, amc.Value-one)),
 		Applicable: true,
 	}
@@ -255,6 +283,7 @@ func applicable(spec *metricSpec, value float64) MetricResult {
 		Value:      value,
 		Applicable: true,
 		Definition: spec.definition,
+		Reason:     "",
 	}
 }
 
@@ -319,6 +348,7 @@ func notApplicable(spec *metricSpec, reason string) MetricResult {
 		Scope:      spec.scope,
 		Applicable: false,
 		Reason:     reason,
+		Value:      zero,
 		Definition: spec.definition,
 	}
 }

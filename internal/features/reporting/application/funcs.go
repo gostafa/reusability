@@ -151,6 +151,7 @@ func metricJSON(metric *reusability.MetricResult) jsonMetric {
 		Applicable: metric.Applicable,
 		Reason:     metric.Reason,
 		Definition: metric.Definition,
+		Value:      nil,
 	}
 
 	if metric.Applicable {
@@ -200,12 +201,7 @@ func rendererFor(input *renderInput) (func() error, bool) {
 }
 
 func renderText(writer io.Writer, report *reusability.Report, opts domain.TextOptions) error {
-	text, err := domain.Text(report, opts)
-	if err != nil {
-		return fmt.Errorf("build text: %w", err)
-	}
-
-	err = writeFullString(writer, text, "write text")
+	err := domain.WriteText(writer, report, opts)
 	if err != nil {
 		return fmt.Errorf("write text body: %w", err)
 	}

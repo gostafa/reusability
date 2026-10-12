@@ -54,10 +54,10 @@ func startCommand(cmd *exec.Cmd) error {
 // variadic call. A lookup failure is left for start to surface, matching
 // [exec.Command]'s deferred behavior.
 func command(name string, args []string) *exec.Cmd {
-	cmd := &exec.Cmd{
-		Path: name,
-		Args: append([]string{name}, args...),
-	}
+	cmd := new(exec.Cmd)
+
+	cmd.Path = name
+	cmd.Args = append([]string{name}, args...)
 
 	resolved, lookErr := exec.LookPath(name)
 	if lookErr == nil {

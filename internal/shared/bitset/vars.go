@@ -3,10 +3,14 @@
 
 package bitset
 
+import (
+	"github.com/gostafa/reusability/internal/shared/zerovalue"
+)
+
 var (
-	_ Setter      = FieldSet{}
-	_ Intersecter = SmallFieldSet{}
-	_ cloner      = FieldSet{}
-	_ container   = FieldSet{}
-	_ counter     = FieldSet{}
+	_ Setter      = zerovalue.Of[FieldSet]()
+	_ Intersecter = zerovalue.Of[SmallFieldSet]()
+	_ cloner      = zerovalue.Of[FieldSet]()
+	_ container   = zerovalue.Of[FieldSet]()
+	_ counter     = zerovalue.Of[FieldSet]()
 )

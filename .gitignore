@@ -1,6 +1,8 @@
 spm-go
 coverage.out
 custom-gcl
+custom-golangci-lint
+test-result.txt
 junit.xml
 reusability-report.html
 .lint

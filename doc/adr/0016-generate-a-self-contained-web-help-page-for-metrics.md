@@ -1,4 +1,4 @@
-# 16. Generate a self-contained web help page for metrics
+# 16. Generate a Self-Contained Web Help Page for Metrics
 
 Date: 2026-07-11
 

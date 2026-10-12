@@ -1,4 +1,4 @@
-# 11. Keep the CLI a thin adapter with CI-friendly exit codes
+# 11. Keep the CLI a Thin Adapter with CI-Friendly Exit Codes
 
 Date: 2026-07-11
 

@@ -3,4 +3,8 @@
 
 package domain
 
-var _ CouplingGraph = DependencyGraph{}
+import (
+	"github.com/gostafa/reusability/internal/shared/zerovalue"
+)
+
+var _ CouplingGraph = zerovalue.Of[DependencyGraph]()

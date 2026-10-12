@@ -42,13 +42,13 @@ func TestMainDelegatesToCLI(t *testing.T) {
 }
 
 func TestMainRunsCLI(t *testing.T) {
-	oldExit, oldArgs := exit, os.Args
-	t.Cleanup(func() { exit, os.Args = oldExit, oldArgs })
-	exit = func(code int) {
-		if code != testZero {
-			t.Fatalf("exit = %d", code)
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+	defer func() {
+		if got := recover(); got != "unexpected call to os.Exit(0) during test" {
+			t.Fatalf("exit = %v", got)
 		}
-	}
+	}()
 	os.Args = []string{"reusability", flagVersion}
 	main()
 }

@@ -5,6 +5,7 @@ package domain
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/gostafa/reusability"
 	"github.com/gostafa/reusability/internal/shared/metrics"
+	"github.com/gostafa/reusability/internal/shared/zerovalue"
 )
 
 // CSVHeader is the fixed CSV column set.
@@ -114,15 +116,41 @@ func ParseFormat(name string) (Format, bool) {
 func Text(report *reusability.Report, opts TextOptions) (string, error) {
 	var builder strings.Builder
 
-	err := writeTextReport(&builder, report, opts)
-	if err != nil {
-		return emptyString, fmt.Errorf("write text report: %w", err)
-	}
+	err := WriteText(&builder, report, opts)
 
-	return builder.String(), nil
+	return builder.String(), err
 }
 
-func writeTextReport(builder *strings.Builder, report *reusability.Report, opts TextOptions) error {
+// WriteText renders a report directly into writer, preserving write failures.
+func WriteText(writer io.Writer, report *reusability.Report, opts TextOptions) error {
+	output := textOutput(func(text string) (int, error) {
+		written, err := io.WriteString(writer, text)
+		if err != nil {
+			return written, fmt.Errorf("write text: %w", err)
+		}
+
+		return written, nil
+	})
+
+	err := writeTextReport(output, report, opts)
+	if err != nil {
+		return fmt.Errorf("write text report: %w", err)
+	}
+
+	return nil
+}
+
+// WriteString delegates to the text destination and preserves its errors.
+func (output textOutput) WriteString(text string) (int, error) {
+	written, err := output(text)
+	if err != nil {
+		return written, fmt.Errorf("write text output: %w", err)
+	}
+
+	return written, nil
+}
+
+func writeTextReport(builder io.StringWriter, report *reusability.Report, opts TextOptions) error {
 	err := writeTextHeader(builder, report, opts.Color)
 	if err != nil {
 		return fmt.Errorf("write header: %w", err)
@@ -141,7 +169,7 @@ func writeTextReport(builder *strings.Builder, report *reusability.Report, opts 
 }
 
 func writeTextTableBody(
-	builder *strings.Builder,
+	builder io.StringWriter,
 	report *reusability.Report,
 	opts TextOptions,
 ) error {
@@ -190,7 +218,7 @@ func writeOptionalNALegend(input *textTailInput) error {
 	return nil
 }
 
-func writeTextHeader(builder *strings.Builder, report *reusability.Report, color bool) error {
+func writeTextHeader(builder io.StringWriter, report *reusability.Report, color bool) error {
 	err := writeBuilderStrings(
 		builder,
 		report.Tool.Name,
@@ -212,7 +240,7 @@ func writeTextHeader(builder *strings.Builder, report *reusability.Report, color
 	return nil
 }
 
-func writeModuleLine(builder *strings.Builder, module string, color bool) error {
+func writeModuleLine(builder io.StringWriter, module string, color bool) error {
 	if module == emptyString {
 		return nil
 	}
@@ -231,7 +259,7 @@ func writeModuleLine(builder *strings.Builder, module string, color bool) error 
 }
 
 func buildTextTable(report *reusability.Report) *textTable {
-	table := &textTable{typeCols: reportColumns(report)}
+	table := &textTable{typeCols: reportColumns(report), rows: nil, widths: nil, sawNA: false}
 
 	table.rows = append(table.rows, headerCells(table))
 
@@ -249,10 +277,13 @@ func buildTextTable(report *reusability.Report) *textTable {
 func headerCells(table *textTable) []tableCell {
 	header := make([]tableCell, indexZero, len(table.typeCols)+1)
 
-	header = append(header, tableCell{text: pathTypeHeader, style: ansiDim})
+	header = append(header, tableCell{text: pathTypeHeader, style: ansiDim, prefix: emptyString})
 
 	for i := range table.typeCols {
-		header = append(header, tableCell{text: abbrev(table.typeCols[i]), style: ansiDim})
+		header = append(
+			header,
+			tableCell{text: abbrev(table.typeCols[i]), style: ansiDim, prefix: emptyString},
+		)
 	}
 
 	return header
@@ -271,11 +302,12 @@ func emitTreeRows(table *textTable, root *treeNode, summaries map[*treeNode]*tre
 		emitNode(&treeEmitInput{
 			table: table, node: root.children[i], summaries: summaries,
 			prefix: emptyString, connector: emptyString,
+			typeCount: indexZero, total: indexZero,
 		})
 	}
 }
 
-func writeNALegend(builder *strings.Builder, color bool) error {
+func writeNALegend(builder io.StringWriter, color bool) error {
 	err := writeBuilderStrings(
 		builder,
 		newline,
@@ -292,7 +324,7 @@ func writeNALegend(builder *strings.Builder, color bool) error {
 }
 
 func writeExplainNotes(
-	builder *strings.Builder,
+	builder io.StringWriter,
 	report *reusability.Report,
 	opts TextOptions,
 ) error {
@@ -308,12 +340,13 @@ func writeExplainNotes(
 	return nil
 }
 
-func writeTextRows(builder *strings.Builder, table *textTable, color bool) (bool, error) {
+func writeTextRows(builder io.StringWriter, table *textTable, color bool) (bool, error) {
 	widths, sawNA := measureRows(table)
 
 	for i := range table.rows {
 		err := writeOneRow(&rowWriteArgs{
 			builder: builder, row: table.rows[i], widths: widths, color: color,
+			last: indexZero,
 		})
 		if err != nil {
 			return false, fmt.Errorf(errWrapWriteRow, err)
@@ -355,7 +388,7 @@ func zeroNoteEntries(size int) []noteEntry {
 	out := make([]noteEntry, indexZero, size)
 
 	for range size {
-		out = append(out, noteEntry{})
+		out = append(out, zerovalue.Of[noteEntry]())
 	}
 
 	return out
@@ -519,10 +552,10 @@ func qualityForMetric(name string) (metricQuality, bool) {
 		return metricQuality{bounded: true, bias: biasHigherBetter}, true
 	}
 
-	return metricQuality{}, false
+	return zerovalue.Of[metricQuality](), false
 }
 
-func writeBuilderString(builder *strings.Builder, text string) error {
+func writeBuilderString(builder io.StringWriter, text string) error {
 	written, err := builder.WriteString(text)
 	if err != nil {
 		return fmt.Errorf("builder write: %w", err)
@@ -535,7 +568,7 @@ func writeBuilderString(builder *strings.Builder, text string) error {
 	return nil
 }
 
-func writeBuilderStrings(builder *strings.Builder, parts ...string) error {
+func writeBuilderStrings(builder io.StringWriter, parts ...string) error {
 	for i := range parts {
 		err := writeBuilderString(builder, parts[i])
 		if err != nil {
@@ -550,7 +583,7 @@ func addStat(stats map[string]*columnStats, name string, value float64) {
 	stat := stats[name]
 
 	if stat == nil {
-		stat = &columnStats{minimum: value, maximum: value}
+		stat = &columnStats{minimum: value, maximum: value, sum: indexZero, count: indexZero}
 		stats[name] = stat
 	}
 
@@ -562,7 +595,11 @@ func addStat(stats map[string]*columnStats, name string, value float64) {
 }
 
 func aggregateTree(node *treeNode, summaries map[*treeNode]*treeSummary) *treeSummary {
-	summary := &treeSummary{typeAgg: make(map[string]*columnStats)}
+	summary := &treeSummary{
+		typeAgg:    make(map[string]*columnStats),
+		pkgsTotal:  indexZero,
+		typesTotal: indexZero,
+	}
 
 	summaries[node] = summary
 	accumulateSelf(node, summary)
@@ -607,7 +644,7 @@ func branchGlyph(index, total int) string {
 }
 
 func buildTree(report *reusability.Report) *treeNode {
-	root := &treeNode{}
+	root := new(treeNode)
 
 	for i := range report.Packages {
 		attachPackage(root, &report.Packages[i], report.Module)
@@ -674,7 +711,7 @@ func meanCell(stat *columnStats, color func(float64) string) tableCell {
 
 	value := stat.sum / float64(stat.count)
 
-	return tableCell{text: formatCell(value), style: ansiBold + color(value)}
+	return tableCell{text: formatCell(value), style: ansiBold + color(value), prefix: emptyString}
 }
 
 func mergeStats(dst, src map[string]*columnStats) {
@@ -702,7 +739,7 @@ func mergeOneStat(dst map[string]*columnStats, name string, src *columnStats) {
 }
 
 func naTableCell() tableCell {
-	return tableCell{text: naCell, style: ansiDim}
+	return tableCell{text: naCell, style: ansiDim, prefix: emptyString}
 }
 
 func nodeTypeAggCells(summary *treeSummary, typeCols []string) []tableCell {
@@ -744,6 +781,7 @@ func collectNoteEntries(pkg *reusability.PackageReport) []noteEntry {
 	state := &noteCollectState{
 		entries: zeroNoteEntries(len(pkg.Types)),
 		index:   make(map[string]int),
+		count:   indexZero,
 	}
 
 	for i := range pkg.Types {
@@ -769,7 +807,7 @@ func appendNoteType(state *noteCollectState, reason, typeName string) {
 	if !ok {
 		pos = state.count
 		state.index[reason] = pos
-		state.entries[pos] = noteEntry{reason: reason}
+		state.entries[pos] = noteEntry{reason: reason, types: nil}
 		state.count++
 	}
 
@@ -797,7 +835,7 @@ func formatOneNote(pkg *reusability.PackageReport, entry *noteEntry) string {
 }
 
 func paint(args *paintArgs) string {
-	return paintText(&TextOptions{Color: args.color}, args.text, args.style)
+	return paintText(&TextOptions{Color: args.color, Explain: false}, args.text, args.style)
 }
 
 func paintText(opts *TextOptions, text, style string) string {
@@ -858,8 +896,9 @@ func oneReusabilityCell(
 	}
 
 	return tableCell{
-		text:  formatCell(result.Value),
-		style: valueColor(name, result.Value, stats[name]),
+		text:   formatCell(result.Value),
+		style:  valueColor(name, result.Value, stats[name]),
+		prefix: emptyString,
 	}
 }
 
@@ -897,7 +936,8 @@ func emitNode(input *treeEmitInput) {
 	branchIn := &treeEmitInput{
 		table: input.table, node: input.node, summaries: input.summaries,
 		prefix: childPrefix, typeCount: typeCount,
-		total: typeCount + len(input.node.children),
+		total:     typeCount + len(input.node.children),
+		connector: emptyString,
 	}
 	emitTypeBranches(branchIn)
 	emitChildNodes(branchIn)
@@ -917,7 +957,7 @@ func emitChildNodes(input *treeEmitInput) {
 		if input.typeCount+i > indexZero {
 			input.table.rows = append(
 				input.table.rows,
-				[]tableCell{{prefix: input.prefix + "│"}},
+				[]tableCell{{prefix: input.prefix + "│", text: emptyString, style: emptyString}},
 			)
 		}
 
@@ -925,6 +965,7 @@ func emitChildNodes(input *treeEmitInput) {
 			table: input.table, node: input.node.children[i],
 			summaries: input.summaries, prefix: input.prefix,
 			connector: branchGlyph(input.typeCount+i, input.total),
+			typeCount: indexZero, total: indexZero,
 		})
 	}
 }
@@ -948,7 +989,10 @@ func typeRow(input *typeRowInput) {
 	typ := &packageOf(input.node).Types[input.index]
 	row := make([]tableCell, indexZero, len(input.table.typeCols)+1)
 
-	row = append(row, tableCell{prefix: input.prefix + input.connector, text: typ.Name})
+	row = append(
+		row,
+		tableCell{prefix: input.prefix + input.connector, text: typ.Name, style: emptyString},
+	)
 	row = append(
 		row,
 		reusabilityCell(&typ.Reusability, input.table.typeCols, input.summary.typeAgg)...,
@@ -978,7 +1022,7 @@ func child(node *treeNode, name string) *treeNode {
 		}
 	}
 
-	created := &treeNode{name: name}
+	created := &treeNode{name: name, pkg: nil, children: nil}
 
 	node.children = append(node.children, created)
 
@@ -1031,6 +1075,10 @@ func valueColor(name string, value float64, stat *columnStats) string {
 		return emptyString
 	}
 
+	return qualityColor(quality, value, stat)
+}
+
+func qualityColor(quality metricQuality, value float64, stat *columnStats) string {
 	if quality.bounded {
 		return thresholdColor(quality.bias, value)
 	}
@@ -1052,8 +1100,8 @@ func tryNormalize(value float64, stat *columnStats) (float64, bool) {
 	return (value - stat.minimum) / (stat.maximum - stat.minimum), true
 }
 
-func writeNotes(builder *strings.Builder, report *reusability.Report, color bool) error {
-	writer := &notesWriter{builder: builder, color: color}
+func writeNotes(builder io.StringWriter, report *reusability.Report, color bool) error {
+	writer := &notesWriter{builder: builder, color: color, wrote: false}
 
 	for i := range report.Packages {
 		err := writeNotesPackage(writer, &report.Packages[i])
@@ -1102,7 +1150,7 @@ func ensureNotesHeader(writer *notesWriter) error {
 	return nil
 }
 
-func writeNotesHeader(builder *strings.Builder, color bool) error {
+func writeNotesHeader(builder io.StringWriter, color bool) error {
 	err := writeBuilderStrings(
 		builder,
 		newline,

@@ -3,7 +3,9 @@
 
 package inbound
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // String summarizes the package result for debugging.
 func (p PackageResult) String() string {

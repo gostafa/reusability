@@ -1,4 +1,4 @@
-# 15. Render a self-contained HTML web report
+# 15. Render a Self-Contained HTML Web Report
 
 Date: 2026-07-11
 

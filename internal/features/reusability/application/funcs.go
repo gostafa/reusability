@@ -9,6 +9,7 @@ import (
 	"github.com/gostafa/reusability/internal/features/reusability/domain"
 	typefacts "github.com/gostafa/reusability/internal/features/typefacts/domain"
 	"github.com/gostafa/reusability/internal/shared/metrics"
+	"github.com/gostafa/reusability/internal/shared/zerovalue"
 )
 
 // NewService validates the weights and returns a reusability evaluator.
@@ -16,7 +17,7 @@ import (
 func NewService(weights *metrics.ReusabilityWeights) (Service, error) {
 	resolved := metrics.DefaultReusabilityWeights()
 
-	if weights != nil && *weights != (metrics.ReusabilityWeights{}) {
+	if weights != nil && *weights != zerovalue.Of[metrics.ReusabilityWeights]() {
 		resolved = *weights
 	}
 

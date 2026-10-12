@@ -1,4 +1,4 @@
-# 17. Superseded: Add go.yaml.in/yaml/v4 for policy config
+# 17. Superseded: Add Go.yaml.in/yaml/v4 for Policy Config
 
 Date: 2026-07-13
 

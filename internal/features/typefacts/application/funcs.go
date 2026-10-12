@@ -11,6 +11,7 @@ import (
 
 	"github.com/gostafa/reusability/internal/features/typefacts/domain"
 	"github.com/gostafa/reusability/internal/features/typefacts/ports/outbound"
+	"github.com/gostafa/reusability/internal/shared/zerovalue"
 )
 
 // Assemble sorts the extracts, assigns dense numeric IDs, and resolves
@@ -52,7 +53,7 @@ func collectFacts(
 	// Load package extracts from the fact source then assemble project facts.
 	modulePath, extracts, err := source(ctx, opts)
 	if err != nil {
-		return domain.ProjectFacts{}, fmt.Errorf("collect: %w", err)
+		return zerovalue.Of[domain.ProjectFacts](), fmt.Errorf("collect: %w", err)
 	}
 
 	return Assemble(modulePath, extracts), nil

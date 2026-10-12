@@ -49,6 +49,14 @@ func TestBuildDependencyGraphScopes(t *testing.T) {
 	}
 }
 
+func TestDependencyGraphLookup(t *testing.T) {
+	t.Parallel()
+	graph := BuildDependencyGraph(scopedFacts(), ScopeAll)
+	if got := graph.Coupling(0); got != graph.Couplings[0] {
+		t.Fatalf("coupling lookup = %+v", got)
+	}
+}
+
 func TestModuleScopeWithoutModuleInfo(t *testing.T) {
 	facts := scopedFacts()
 	facts.ModulePath = ""

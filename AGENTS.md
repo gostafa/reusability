@@ -16,11 +16,14 @@ Every Go package may contain only the following Go filenames. Replace `PACKAGENA
 | `vars.go` | Package variables, including sentinel errors |
 | `consts.go` | Constants |
 | `types.go` | Type declarations and package documentation |
+| `types_SUFFIX.go` | Additional type declarations, grouped by purpose |
 | `PACKAGENAME_test.go` | Tests of unexported implementation, using `package PACKAGENAME` |
 | `PACKAGENAME_integration_test.go` | Tests of exported behavior, using `package PACKAGENAME_test` and only exported APIs |
 | `PACKAGENAME_bench_test.go` | Benchmarks |
 
 Place package documentation on the package declaration in `types.go`. Consolidate Go code into the allowed filenames when changing a package; names such as `doc.go`, `errors.go`, and additional test filenames are outside this convention. Non-Go repository files are unaffected.
+
+Split type declarations into `types_SUFFIX.go` files when needed to keep each file at five or fewer exported types. The revive `max-public-structs` rule counts every exported type declaration, including aliases and interfaces; preserve the public API when splitting files.
 
 ## Public API Boundaries
 
@@ -53,6 +56,6 @@ Prefer lean-ctx for repository work: `ctx_read` for file reads, `ctx_search` for
 ## Learned Workspace Facts
 
 * Module path is `github.com/gostafa/reusability`; the plugin package is `github.com/gostafa/reusability/plugin`.
-* Coverlint requires 100% coverage including `cmd/reusability`; use the coverlint testable-main pattern (injectable `run`/`exit`, tests that exercise `main` without `os.Exit`).
+* Coverlint requires 100% coverage including `cmd/reusability`; keep `run`/`exit` injectable through `mainRuntime` fields. The `main` test recovers Go testing's `os.Exit(0)` guard so it exercises the entry point without terminating the test process.
 * Distance max is 0.30 and reusability min is 0.80; represent DTOs as `type T = struct{...}` aliases so they are not scored as named types.
 * Local CI is `task taskotter:ci` / `task taskotter:ci:fix` via Taskotter custom golangci-lint (coverlint, distance, reusability, and reusability).

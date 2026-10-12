@@ -476,7 +476,7 @@ func isAllowedProductionFile(name string) bool {
 	if allowedProductionFiles[name] {
 		return true
 	}
-	return false
+	return strings.HasPrefix(name, "types_") && strings.HasSuffix(name, ".go")
 }
 
 func isLayoutExcludedDir(dir string) bool {
@@ -546,7 +546,7 @@ func assertPackageFileLayout(t *testing.T, dir string) {
 		}
 		if !isAllowedProductionFile(name) {
 			t.Errorf(
-				"%s: disallowed production file %q (allowed: consts.go, types.go, vars.go, funcs.go)",
+				"%s: disallowed production file %q (allowed: consts.go, types.go, types_*.go, vars.go, funcs.go)",
 				dir,
 				name,
 			)
@@ -559,6 +559,9 @@ func assertPackageFileLayout(t *testing.T, dir string) {
 					continue
 				case token.TYPE:
 					want = "types.go"
+					if strings.HasPrefix(name, "types_") {
+						want = name
+					}
 				case token.CONST:
 					want = "consts.go"
 				case token.VAR:

@@ -3,7 +3,9 @@
 
 package plugin
 
-import "github.com/golangci/plugin-module-register/register"
+import (
+	"github.com/golangci/plugin-module-register/register"
+)
 
 var (
 	_ register.LinterPlugin = Plugin(nil)

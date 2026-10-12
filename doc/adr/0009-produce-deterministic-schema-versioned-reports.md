@@ -1,4 +1,4 @@
-# 9. Produce deterministic schema-versioned reports
+# 9. Produce Deterministic Schema-Versioned Reports
 
 Date: 2026-07-11
 

@@ -4,6 +4,7 @@
 package domain
 
 import (
+	"errors"
 	"regexp"
 	"strings"
 	"testing"
@@ -18,6 +19,112 @@ func TestRelPathEdges(t *testing.T) {
 	}
 	if got := relPath("other.com/x", "example.com/m"); got != "other.com/x" {
 		t.Fatalf("outside module: got %q", got)
+	}
+}
+
+type failingTextWriter struct {
+	calls, failAt int
+	short         bool
+	err           error
+}
+
+func (writer *failingTextWriter) Write(payload []byte) (int, error) {
+	writer.calls++
+	if writer.calls == writer.failAt {
+		if writer.short {
+			return len(payload) - 1, nil
+		}
+		return 0, writer.err
+	}
+	return len(payload), nil
+}
+
+func TestTextPropagatesEveryWriteFailure(t *testing.T) {
+	t.Parallel()
+	report := &reusability.Report{
+		Module: "example",
+		Tool:   reusability.ToolInfo{Name: "reusability", Version: "dev"},
+		Packages: []reusability.PackageReport{
+			{
+				Path: "example",
+				Types: []reusability.TypeReport{
+					{
+						Name: "Root",
+						Reusability: reusability.MetricResult{
+							Applicable: false,
+							Reason:     "no methods",
+						},
+					},
+				},
+			},
+			{
+				Path: "example/child",
+				Types: []reusability.TypeReport{
+					{
+						Name: "Child",
+						Reusability: reusability.MetricResult{
+							Applicable: true,
+							Value:      0.5,
+							Reason:     "dropped components",
+						},
+					},
+				},
+			},
+		},
+	}
+	sentinel := errors.New("text destination failed")
+	for failAt := 1; ; failAt++ {
+		writer := &failingTextWriter{failAt: failAt, err: sentinel}
+		err := WriteText(writer, report, TextOptions{Explain: true})
+		if err == nil {
+			if writer.calls+1 != failAt {
+				t.Fatalf("failure %d was swallowed", failAt)
+			}
+			break
+		}
+		if !errors.Is(err, sentinel) {
+			t.Fatalf("failure %d = %v", failAt, err)
+		}
+	}
+	writer := &failingTextWriter{failAt: 1, short: true}
+	if err := WriteText(writer, report, TextOptions{}); !errors.Is(err, errShortWrite) {
+		t.Fatalf("short write = %v", err)
+	}
+}
+
+func TestUnboundedColorNormalization(t *testing.T) {
+	t.Parallel()
+	quality := metricQuality{bounded: false, bias: biasLowerBetter}
+	if got := qualityColor(quality, 1, nil); got != "" {
+		t.Fatalf("nil stats = %q", got)
+	}
+	if got := qualityColor(quality, 1, &columnStats{minimum: 1, maximum: 1}); got != "" {
+		t.Fatalf("constant stats = %q", got)
+	}
+	if got := qualityColor(quality, 0, &columnStats{minimum: 0, maximum: 1}); got != ansiGreen {
+		t.Fatalf("lower score = %q", got)
+	}
+}
+
+func TestEmptyColumnsAndUnknownLabels(t *testing.T) {
+	t.Parallel()
+	var builder strings.Builder
+	if err := writeModuleLine(&builder, "", false); err != nil || builder.Len() != 0 {
+		t.Fatalf("empty module = %q, %v", builder.String(), err)
+	}
+	if lastFilledCell([]tableCell{{text: "name"}, {}, {}}) != 0 {
+		t.Fatal("empty trailing cells must be trimmed")
+	}
+	if abbrev("custom") != "CUSTOM" {
+		t.Fatal("unknown columns must use uppercase labels")
+	}
+	if reportColumns(
+		&reusability.Report{Packages: []reusability.PackageReport{{Path: "empty"}}},
+	) != nil {
+		t.Fatal("empty package must have no columns")
+	}
+	if thresholdColor(biasHigherBetter, 0) != ansiRed {
+		t.Fatal("low quality must be red")
 	}
 }
 

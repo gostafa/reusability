@@ -5,6 +5,20 @@ package bitset
 
 import "testing"
 
+func TestEmptyAndDisjointSets(t *testing.T) {
+	t.Parallel()
+	empty := NewFieldSet(0)
+	if Count(Clone(empty)) != 0 || Contains(empty, 100) || Small(empty).Intersects(Small(empty)) {
+		t.Fatal("empty set must remain empty")
+	}
+	left, right := NewFieldSet(128), NewFieldSet(128)
+	left.Set(0)
+	right.Set(127)
+	if Intersects(left, right) {
+		t.Fatal("disjoint sets must not intersect")
+	}
+}
+
 // Black-box: the exported multi-word set operations.
 func TestFieldSetOperations(t *testing.T) {
 	t.Parallel()

@@ -27,6 +27,7 @@ import (
 	"github.com/gostafa/reusability/internal/features/reporting/ports/outbound"
 	"github.com/gostafa/reusability/internal/shared/metrics"
 	"github.com/gostafa/reusability/internal/shared/version"
+	"github.com/gostafa/reusability/internal/shared/zerovalue"
 )
 
 // Run executes reusability with args and returns its process exit code.
@@ -34,6 +35,7 @@ func Run(args []string) int { return execute(args) }
 
 func asConfig(set *flag.FlagSet, vals *flagValues, wts *reusability.Weights) reusability.Config {
 	return reusability.Config{
+		Directory:          emptyString,
 		Patterns:           set.Args(),
 		IncludeTests:       *vals.includeTests,
 		IncludeGenerated:   *vals.generated,
@@ -137,7 +139,7 @@ func closeOSFile(file *os.File) error {
 }
 
 func doneParse(code int) parseResult {
-	return parseResult{code: code, done: true}
+	return parseResult{cfg: zerovalue.Of[runtimeConfig](), code: code, done: true}
 }
 
 func enforcePolicy(ctx context.Context, cfg *runtimeConfig, report *reusability.Report) int {
@@ -206,7 +208,11 @@ func finishRuntime(args *buildArgs, format *formatResult, gating *gatingResult) 
 	args.format = format
 	args.gating = gating
 
-	return parseResult{cfg: runtimeConfiguration(args, &weightsOutcome.weights)}
+	return parseResult{
+		cfg:  runtimeConfiguration(args, &weightsOutcome.weights),
+		code: exitOK,
+		done: false,
+	}
 }
 
 func runtimeConfiguration(args *buildArgs, weights *reusability.Weights) runtimeConfig {
@@ -290,7 +296,7 @@ func newFlagSet() (flagSet *flag.FlagSet, vals *flagValues) {
 
 	flagSet.Usage = func() { printUsage(flagSet) }
 
-	vals = &flagValues{}
+	vals = new(flagValues)
 	registerReportFlags(flagSet, vals)
 	registerWeightFlags(flagSet, vals)
 	registerAnalysisFlags(flagSet, vals)
@@ -301,10 +307,11 @@ func newFlagSet() (flagSet *flag.FlagSet, vals *flagValues) {
 
 func newLogger(level slog.Leveler) *slog.Logger {
 	opts := &slog.HandlerOptions{
-		Level: level,
+		AddSource: false,
+		Level:     level,
 		ReplaceAttr: func(groups []string, attr slog.Attr) slog.Attr {
 			if len(groups) == exitOK && (attr.Key == slog.TimeKey || attr.Key == slog.LevelKey) {
-				return slog.Attr{}
+				return zerovalue.Of[slog.Attr]()
 			}
 
 			return attr
@@ -369,33 +376,35 @@ func parseCLI(args []string) parseResult {
 		return parseVersion()
 	}
 
-	return buildRuntime(&buildArgs{flagSet: flagSet, vals: vals, logger: loggerFor(vals)})
+	return buildRuntime(
+		&buildArgs{flagSet: flagSet, vals: vals, logger: loggerFor(vals), format: nil, gating: nil},
+	)
 }
 
 func parseHelpOrUsage(err error, args []string) parseResult {
 	if errors.Is(err, flag.ErrHelp) && wantsWebHelp(args) {
-		return parseResult{code: runWebHelp(), done: true}
+		return doneParse(runWebHelp())
 	}
 
-	return parseResult{code: exitUsage, done: true}
+	return doneParse(exitUsage)
 }
 
 func parseRuleSpec(value string) (ruleSpec, error) {
 	pattern, number, ok := strings.Cut(value, ":")
 
 	if !ok {
-		return ruleSpec{}, fmt.Errorf("%w: got %q", errExpectedPatternMin, value)
+		return zerovalue.Of[ruleSpec](), fmt.Errorf("%w: got %q", errExpectedPatternMin, value)
 	}
 
 	pattern = strings.TrimSpace(pattern)
 
 	if pattern == emptyString {
-		return ruleSpec{}, fmt.Errorf("%w: %q", errEmptyPattern, value)
+		return zerovalue.Of[ruleSpec](), fmt.Errorf("%w: %q", errEmptyPattern, value)
 	}
 
 	parsed, err := strconv.ParseFloat(strings.TrimSpace(number), floatBits)
 	if err != nil {
-		return ruleSpec{}, fmt.Errorf("invalid number in %q: %w", value, err)
+		return zerovalue.Of[ruleSpec](), fmt.Errorf("invalid number in %q: %w", value, err)
 	}
 
 	return ruleSpec{pattern: pattern, minimum: parsed}, nil
@@ -404,10 +413,10 @@ func parseRuleSpec(value string) (ruleSpec, error) {
 func parseVersion() parseResult {
 	err := printTo(os.Stdout, "reusability "+version.Version()+"\n")
 	if err != nil {
-		return parseResult{code: exitFail, done: true}
+		return doneParse(exitFail)
 	}
 
-	return parseResult{code: exitOK, done: true}
+	return doneParse(exitOK)
 }
 
 func policyFailed(ctx context.Context, cfg *runtimeConfig, items []policydomain.Violation) int {
@@ -555,7 +564,7 @@ func renderHelpDocs(path string) (string, error) {
 		return sinks.OpenFile(fileSink)
 	}), version.Version())
 	if err != nil {
-		return emptyString, fmt.Errorf("write help docs: %w", err)
+		return emptyString, fmt.Errorf(errWriteHelpDocs, err)
 	}
 
 	return path, nil
@@ -575,7 +584,7 @@ func reportSink(output string) outbound.Sink {
 
 func resolveGating(vals *flagValues, logger *slog.Logger) gatingResult {
 	if !*vals.check {
-		return gatingResult{ok: true}
+		return gatingResult{source: emptyString, rules: nil, code: exitOK, ok: true}
 	}
 
 	resolved, source, err := resolvePolicy(vals.rules)
@@ -586,10 +595,10 @@ func resolveGating(vals *flagValues, logger *slog.Logger) gatingResult {
 			slog.Any(keyError, err),
 		)
 
-		return gatingResult{code: exitUsage}
+		return gatingResult{source: emptyString, rules: nil, code: exitUsage, ok: false}
 	}
 
-	return gatingResult{rules: resolved, source: source, ok: true}
+	return gatingResult{rules: resolved, source: source, code: exitOK, ok: true}
 }
 
 func resolvePolicy(rules []ruleSpec) (specs []ruleSpec, source string, err error) {
@@ -623,7 +632,7 @@ func resolveReportFormat(args *buildArgs) formatResult {
 	name, code, ok := applyWebFormat(args)
 
 	if !ok {
-		return formatResult{code: code}
+		return formatResult{format: emptyString, code: code, ok: false}
 	}
 
 	format, ok := reportingdomain.ParseFormat(name)
@@ -636,33 +645,34 @@ func resolveReportFormat(args *buildArgs) formatResult {
 			slog.String(keyWant, wantFormatValues),
 		)
 
-		return formatResult{code: exitUsage}
+		return formatResult{format: emptyString, code: exitUsage, ok: false}
 	}
 
-	return formatResult{format: string(format), ok: true}
+	return formatResult{format: string(format), code: exitOK, ok: true}
 }
 
 func resolveWeights(vals *flagValues, logger *slog.Logger) weightsResult {
-	weights := reusability.Weights{
+	weights := flagWeights(vals)
+
+	internalWeights := metrics.ReusabilityWeights(weights)
+
+	err := internalWeights.Validate()
+	if err != nil {
+		logger.ErrorContext(context.Background(), msgAnalysisFailed, slog.Any(keyError, err))
+
+		return weightsResult{weights: weights, code: exitFail, ok: false}
+	}
+
+	return weightsResult{weights: weights, code: exitOK, ok: true}
+}
+
+func flagWeights(vals *flagValues) reusability.Weights {
+	return reusability.Weights{
 		Cohesion:      *vals.reusabilityWeightCohesion,
 		Coupling:      *vals.reusabilityWeightCoupling,
 		Testability:   *vals.reusabilityWeightTestability,
 		Documentation: *vals.reusabilityWeightDocumentation,
 	}
-
-	internalWeights := metrics.ReusabilityWeights(weights)
-	err := internalWeights.Validate()
-	if err != nil {
-		logger.ErrorContext(
-			context.Background(),
-			msgAnalysisFailed,
-			slog.Any(keyError, err),
-		)
-
-		return weightsResult{code: exitFail}
-	}
-
-	return weightsResult{weights: weights, ok: true}
 }
 
 func ruleSlices(rules []ruleSpec) (patterns []string, mins []float64) {
@@ -686,7 +696,7 @@ func runAnalyze(
 
 	report, err := analyze(ctx, &cfg.analysis)
 	if err != nil {
-		return reusability.Report{}, failAnalyze(ctx, cfg.logger, err)
+		return zerovalue.Of[reusability.Report](), failAnalyze(ctx, cfg.logger, err)
 	}
 
 	cfg.logger.DebugContext(
@@ -837,12 +847,24 @@ func writeHeapIfNeeded(ctx context.Context, cfg *runtimeConfig) int {
 }
 
 func writeHelpDocs() (string, error) {
-	file, err := os.CreateTemp(emptyString, helpTempPattern)
+	path, err := writeHelpDocsWith(os.CreateTemp, finalizeHelpDocs)
+	if err != nil {
+		return emptyString, fmt.Errorf(errWriteHelpDocs, err)
+	}
+
+	return path, nil
+}
+
+func writeHelpDocsWith(
+	create func(string, string) (*os.File, error),
+	finalize func(*os.File, string) (string, error),
+) (string, error) {
+	file, err := create(emptyString, helpTempPattern)
 	if err != nil {
 		return emptyString, fmt.Errorf("create help temp: %w", err)
 	}
 
-	path, err := finalizeHelpDocs(file, file.Name())
+	path, err := finalize(file, file.Name())
 	if err != nil {
 		return emptyString, fmt.Errorf("finalize help docs: %w", err)
 	}

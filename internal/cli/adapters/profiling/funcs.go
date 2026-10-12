@@ -181,7 +181,11 @@ func createInRoot(root *os.Root, name string) (*os.File, error) {
 }
 
 func closeRoot(root *os.Root) {
-	closeErr := root.Close()
+	closeRootWith(root.Close)
+}
+
+func closeRootWith(closeResource func() error) {
+	closeErr := closeResource()
 	if closeErr != nil {
 		return
 	}

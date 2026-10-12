@@ -4,7 +4,9 @@
 // Package application provides reusable analysis utilities.
 package application
 
-import "github.com/gostafa/reusability/internal/shared/metrics"
+import (
+	"github.com/gostafa/reusability/internal/shared/metrics"
+)
 
 type (
 	// Result is the complexity metrics for one named type.

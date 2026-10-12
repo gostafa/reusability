@@ -3,7 +3,9 @@
 
 package goloader
 
-import "golang.org/x/tools/go/packages"
+import (
+	"golang.org/x/tools/go/packages"
+)
 
 const (
 	zero = 0

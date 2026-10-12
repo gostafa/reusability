@@ -1,4 +1,4 @@
-# 5. Ban the legacy project identifier
+# 5. Ban the Legacy Project Identifier
 
 Date: 2026-07-11
 

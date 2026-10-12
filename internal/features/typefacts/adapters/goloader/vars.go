@@ -3,7 +3,9 @@
 
 package goloader
 
-import "errors"
+import (
+	"errors"
+)
 
 var (
 	errNoPackagesMatched   = errors.New("no packages matched patterns")

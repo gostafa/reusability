@@ -4,7 +4,9 @@
 // Package workerpool provides reusable analysis utilities.
 package workerpool
 
-import "sync"
+import (
+	"sync"
+)
 
 type (
 	// RunConfig configures a bounded parallel map over task indices.

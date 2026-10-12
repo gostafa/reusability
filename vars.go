@@ -3,7 +3,9 @@
 
 package reusability
 
-import "errors"
+import (
+	"errors"
+)
 
 var (
 	// ErrConfig identifies invalid analysis configuration.

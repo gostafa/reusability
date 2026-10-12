@@ -34,12 +34,18 @@ func New(settings *Settings) (*analysis.Analyzer, error) {
 
 	active := newRunner(&resolved)
 
-	return &analysis.Analyzer{
-		Name:       Name,
-		Doc:        Doc,
-		ResultType: reflect.TypeFor[*runResult](),
-		Run:        func(pass *analysis.Pass) (any, error) { return runRunner(active, pass) },
-	}, nil
+	return newAnalysisAnalyzer(active), nil
+}
+
+func newAnalysisAnalyzer(active *runner) *analysis.Analyzer {
+	result := new(analysis.Analyzer)
+
+	result.Name = Name
+	result.Doc = Doc
+	result.ResultType = reflect.TypeFor[*runResult]()
+	result.Run = func(pass *analysis.Pass) (any, error) { return runRunner(active, pass) }
+
+	return result
 }
 
 // UnmarshalSettings accepts snake_case tags and remaps kebab-case keys from
@@ -206,13 +212,21 @@ func validateSettingsWeightsAndRules(settings *Settings) error {
 		return fmt.Errorf(errFmtValidate, err)
 	}
 
-	rules, err := settingsRules(settings)
+	err = validateRulesOutcome(settingsRules(settings))
+	if err != nil {
+		return fmt.Errorf(errFmtValidate, err)
+	}
+
+	return nil
+}
+
+func validateRulesOutcome(rules []policydomain.Rule, err error) error {
 	if err != nil {
 		return fmt.Errorf(errFmtValidate, err)
 	}
 
 	if len(rules) == zero {
-		return fmt.Errorf(errFmtValidate, errRuleMinRequired)
+		return errRuleMinRequired
 	}
 
 	return nil
@@ -308,7 +322,12 @@ func groupByPackage(violations []policydomain.Violation) map[string][]policydoma
 }
 
 func newRunner(settings *Settings) *runner {
-	return &runner{settings: *settings, analyzer: reusability.Analyze}
+	state := new(runner)
+
+	state.settings = *settings
+	state.analyzer = reusability.Analyze
+
+	return state
 }
 
 // packagePos returns a position for package-scoped diagnostics: the package
@@ -324,12 +343,24 @@ func packagePos(pass *analysis.Pass) token.Pos {
 }
 
 func remapKebabKeys(data []byte) ([]byte, error) {
+	encoded, err := remapKebabKeysWith(data, marshalRemappedKeys)
+	if err != nil {
+		return nil, fmt.Errorf(errFmtRemap, err)
+	}
+
+	return encoded, nil
+}
+
+func remapKebabKeysWith(
+	data []byte,
+	marshal func(map[string]json.RawMessage) ([]byte, error),
+) ([]byte, error) {
 	raw, err := unmarshalSettingsMap(data)
 	if err != nil {
 		return nil, fmt.Errorf(errFmtRemap, err)
 	}
 
-	encoded, err := marshalRemappedKeys(raw)
+	encoded, err := marshal(raw)
 	if err != nil {
 		return nil, fmt.Errorf(errFmtRemap, err)
 	}
@@ -368,9 +399,13 @@ func reportViolations(pass *analysis.Pass, violations []policydomain.Violation) 
 	for index := range violations {
 		violation := &violations[index]
 		pass.Report(analysis.Diagnostic{
-			Pos:      violationPos(pass, violation),
-			Category: Name,
-			Message:  formatViolation(violation),
+			Pos:            violationPos(pass, violation),
+			Category:       Name,
+			Message:        formatViolation(violation),
+			End:            token.NoPos,
+			URL:            "",
+			SuggestedFixes: nil,
+			Related:        nil,
 		})
 	}
 }
@@ -388,7 +423,7 @@ func runRunner(state *runner, pass *analysis.Pass) (*runResult, error) {
 
 	reportViolations(pass, state.byPkg[pass.Pkg.Path()])
 
-	return &runResult{}, nil
+	return new(runResult), nil
 }
 
 // typePos returns the position of the named type's TypeSpec identifier, or

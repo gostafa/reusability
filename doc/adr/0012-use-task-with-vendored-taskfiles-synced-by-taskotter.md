@@ -1,4 +1,4 @@
-# 12. Use Task with vendored taskfiles synced by taskotter
+# 12. Use Task with Vendored Taskfiles Synced by Taskotter
 
 Date: 2026-07-11
 

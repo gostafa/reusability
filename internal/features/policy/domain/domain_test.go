@@ -268,3 +268,21 @@ func TestDefaultRules(t *testing.T) {
 		t.Fatalf("DefaultRules() = %+v", rules)
 	}
 }
+
+func TestUnmatchedAndDefaultRules(t *testing.T) {
+	t.Parallel()
+	if MatchPackage("", "p") {
+		t.Fatal("empty pattern must not match a package")
+	}
+	report := reusability.Report{
+		Packages: []reusability.PackageReport{
+			{Path: "p", Types: []reusability.TypeReport{{Name: "T", Reusability: typeMetric(0.1)}}},
+		},
+	}
+	if got := Evaluate(&report, nil); len(got) != 1 {
+		t.Fatalf("default rules = %v", got)
+	}
+	if got := Evaluate(&report, []Rule{{Pattern: "other", Min: 1}}); len(got) != 0 {
+		t.Fatalf("unmatched = %v", got)
+	}
+}

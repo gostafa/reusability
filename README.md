@@ -1,4 +1,4 @@
-# reusability
+# Reusability
 
 
 [![`Workflow for reusability Action`](https://github.com/gostafa/reusability/actions/workflows/main.yml/badge.svg)](https://github.com/gostafa/reusability/actions/workflows/main.yml)
@@ -83,7 +83,7 @@ wildcards, then longer patterns. Exact ties use the later rule. This lets a
 narrow rule lower a DTO/config-heavy package's threshold without weakening the
 global baseline. Rules match package import paths, not file names.
 
-### Build from source
+### Build from Source
 
 ```bash
 git clone https://github.com/gostafa/reusability.git
@@ -93,7 +93,7 @@ go build -o ./bin/reusability ./cmd/reusability
 ./bin/reusability
 ```
 
-## Use as a golangci-lint plugin
+## Use as a Golangci-Lint Plugin
 
 The plugin must be included in a custom `golangci-lint` binary.
 
@@ -144,7 +144,7 @@ golangci-lint custom -v
 Always run the generated `custom-golangci-lint` binary. The standard
 `golangci-lint` binary does not include the plugin.
 
-## Exit codes
+## Exit Codes
 
 * `0`: success
 * `1`: analysis or write error

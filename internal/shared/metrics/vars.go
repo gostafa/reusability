@@ -3,7 +3,9 @@
 
 package metrics
 
-import "errors"
+import (
+	"errors"
+)
 
 var (
 	_ Validator = (*ReusabilityWeights)(nil)

@@ -135,6 +135,13 @@ func TestSortedUniqueSelfOnly(t *testing.T) {
 	}
 }
 
+func TestEmptyReferenceHelpers(t *testing.T) {
+	t.Parallel()
+	if orNil(nil) != nil || dedupSorted(nil) != nil {
+		t.Fatal("empty references must remain nil")
+	}
+}
+
 func benchExtracts(pkgCount, typesPerPkg int) []domain.PackageExtract {
 	pkgs := make([]domain.PackageExtract, pkgCount)
 	for p := range pkgs {

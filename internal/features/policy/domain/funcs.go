@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gostafa/reusability"
+	"github.com/gostafa/reusability/internal/shared/zerovalue"
 )
 
 // DefaultRules returns the recommended baseline when no rules are configured
@@ -43,19 +44,15 @@ func FormatViolations(violations []Violation) string {
 		return emptyString
 	}
 
-	var builder strings.Builder
+	lines := make([]string, zero, one+len(violations))
 
-	err := writeViolationHeader(&builder, len(violations))
-	if err != nil {
-		return emptyString
+	lines = append(lines, violationHeader(len(violations)))
+
+	for index := range violations {
+		lines = append(lines, violationLine(&violations[index]))
 	}
 
-	err = writeViolationLines(&builder, violations)
-	if err != nil {
-		return emptyString
-	}
-
-	return builder.String()
+	return strings.Join(lines, emptyString)
 }
 
 // MatchPackage reports whether pattern matches importPath. * matches exactly
@@ -111,9 +108,11 @@ func evaluatePackage(pkg *reusability.PackageReport, rules []Rule) []Violation {
 	var violations []Violation
 
 	for index := range pkg.Types {
-		if violation, ok := violationForType(&typeGate{
+		violation, ok := violationForType(&typeGate{
 			pkgPath: pkg.Path, typ: &pkg.Types[index], threshold: threshold, pattern: pattern,
-		}); ok {
+		})
+
+		if ok {
 			violations = append(violations, violation)
 		}
 	}
@@ -178,18 +177,18 @@ func matchOne(pattern, path []string, pos *matchPos) bool {
 }
 
 func matchSegments(pattern, path []string) bool {
-	return matchFrom(pattern, path, matchPos{})
+	return matchFrom(pattern, path, zerovalue.Of[matchPos]())
 }
 
 func violationForType(gate *typeGate) (Violation, bool) {
 	if !gate.typ.Reusability.Applicable {
-		return Violation{}, false
+		return zerovalue.Of[Violation](), false
 	}
 
 	value := gate.typ.Reusability.Value
 
 	if value+comparisonTolerance(value, gate.threshold) >= gate.threshold {
-		return Violation{}, false
+		return zerovalue.Of[Violation](), false
 	}
 
 	return Violation{
@@ -298,49 +297,23 @@ func validateRule(key string, rule Rule) error {
 	return nil
 }
 
-func writef(builder *strings.Builder, format string, args ...any) error {
-	written, err := fmt.Fprintf(builder, format, args...)
-	if err != nil {
-		return fmt.Errorf(errFmtWrite, err)
-	}
-
-	if written < zero {
-		return fmt.Errorf(errFmtWrite, errNegativeWrite)
-	}
-
-	return nil
-}
-
-func writeViolationHeader(builder *strings.Builder, count int) error {
+func violationHeader(count int) string {
 	noun := "violations"
 
 	if count == one {
 		noun = "violation"
 	}
 
-	err := writef(builder, "policy: %d %s\n", count, noun)
-	if err != nil {
-		return fmt.Errorf("writeViolationHeader: %w", err)
-	}
-
-	return nil
+	return fmt.Sprintf("policy: %d %s\n", count, noun)
 }
 
-func writeViolationLines(builder *strings.Builder, violations []Violation) error {
-	for index := range violations {
-		violation := &violations[index]
-		where := violation.Package + "." + violation.Type + " (type)"
+func violationLine(violation *Violation) string {
+	where := violation.Package + "." + violation.Type + " (type)"
 
-		err := writef(builder, "  %s: reusability %s is below min %s (rule %s)\n",
-			where,
-			formatNumber(violation.Value),
-			formatNumber(violation.Threshold),
-			violation.Rule,
-		)
-		if err != nil {
-			return fmt.Errorf("writeViolationLines: %w", err)
-		}
-	}
-
-	return nil
+	return fmt.Sprintf("  %s: reusability %s is below min %s (rule %s)\n",
+		where,
+		formatNumber(violation.Value),
+		formatNumber(violation.Threshold),
+		violation.Rule,
+	)
 }

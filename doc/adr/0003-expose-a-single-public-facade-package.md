@@ -1,4 +1,4 @@
-# 3. Expose a single public facade package
+# 3. Expose a Single Public Facade Package
 
 Date: 2026-07-11
 
@@ -23,8 +23,8 @@ The root package `modularity` remains the public metrics API. It exposes
 
 Two additional public packages exist solely for lint integration (ADR 0019):
 
-- `analyzer` — a `go/analysis` Analyzer with no golangci-lint dependency
-- `plugin` — the Module Plugin registration entry point
+* `analyzer` — a `go/analysis` Analyzer with no golangci-lint dependency
+* `plugin` — the Module Plugin registration entry point
 
 Every other implementation package lives under `internal/`, which the Go
 compiler makes unimportable from outside the module.

@@ -6,6 +6,7 @@ package cli
 const (
 	defaultWebReportName = "reusability-report.html"
 	helpTempPattern      = "reusability-help-*.html"
+	errWriteHelpDocs     = "write help docs: %w"
 
 	emptyString = ""
 	commaSep    = ","

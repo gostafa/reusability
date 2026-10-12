@@ -11,6 +11,29 @@ import (
 )
 
 // Black-box: every task runs exactly once.
+func TestEmptyAndCanceledPools(t *testing.T) {
+	t.Parallel()
+	if err := Run(t.Context(), RunConfig{}); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	for _, count := range []int{0, 3} {
+		if err := Run(
+			ctx,
+			RunConfig{Workers: 1, TaskCount: count, Fn: func(int) error { return nil }},
+		); !errors.Is(
+			err,
+			context.Canceled,
+		) {
+			t.Fatalf("canceled pool(%d) = %v", count, err)
+		}
+	}
+	// An unbuffered dispatch with no consumer must select cancellation.
+	pool := &pool{tasks: make(chan int), errs: make([]error, 1)}
+	dispatch(ctx, pool)
+}
+
 func TestRunAllTasks(t *testing.T) {
 	t.Parallel()
 

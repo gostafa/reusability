@@ -20,6 +20,7 @@ import (
 	"github.com/gostafa/reusability/internal/features/typefacts/ports/outbound"
 	"github.com/gostafa/reusability/internal/shared/bitset"
 	"github.com/gostafa/reusability/internal/shared/workerpool"
+	"github.com/gostafa/reusability/internal/shared/zerovalue"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -248,6 +249,7 @@ func extractPackage(pkg *packages.Package, opts *extractorOptions) domain.Packag
 		Path:     pkg.PkgPath,
 		InModule: inModule(pkg, opts.modulePath),
 		Imports:  importPaths(pkg),
+		Types:    nil,
 	}
 	collectTypeExtracts(&out, ctx)
 
@@ -337,10 +339,15 @@ func baseTypeExtract(
 	named *types.Named,
 ) domain.TypeExtract {
 	return domain.TypeExtract{
-		Name:     typeName.Name(),
-		Exported: typeName.Exported(),
-		Kind:     typeKind(named),
-		Pos:      position(ctx.pkg.Fset, ctx.baseDir, typeName.Pos()),
+		Name:                      typeName.Name(),
+		Exported:                  typeName.Exported(),
+		Kind:                      typeKind(named),
+		Pos:                       position(ctx.pkg.Fset, ctx.baseDir, typeName.Pos()),
+		Fields:                    nil,
+		Methods:                   nil,
+		ReferencedTypeKeys:        nil,
+		ExportedMembers:           zero,
+		DocumentedExportedMembers: zero,
 	}
 }
 
@@ -416,6 +423,7 @@ func indexSyntax(pkg *packages.Package) syntaxIndex {
 		generated: make(map[string]bool),
 		funcDecls: make(map[*types.Func]*ast.FuncDecl),
 		typeDocs:  make(map[types.Object]bool),
+		fieldDocs: nil,
 	}
 
 	for i := range pkg.Syntax {
@@ -530,7 +538,7 @@ func load(
 		return emptyString, nil, fmt.Errorf("goloader packages: %w", err)
 	}
 
-	job := &extractJob{pkgs: pkgs, opts: opts}
+	job := &extractJob{pkgs: pkgs, opts: opts, modulePath: emptyString}
 
 	modulePath, extracts, finishErr := extractLoaded(ctx, deps, job)
 	if finishErr != nil {
@@ -622,10 +630,8 @@ func packagePatterns(opts *outbound.FactOptions) []string {
 
 func packageLoadConfig(ctx context.Context, opts *outbound.FactOptions) *packages.Config {
 	cfg := &packages.Config{
-		Context: ctx,
-		Dir:     opts.Directory,
-		Mode:    loadMode,
-		Tests:   opts.IncludeTests,
+		Context: ctx, Dir: opts.Directory, Mode: loadMode, Tests: opts.IncludeTests,
+		Logf: nil, Env: nil, BuildFlags: nil, Fset: nil, ParseFile: nil, Overlay: nil,
 	}
 
 	if len(opts.BuildTags) > zero {
@@ -772,10 +778,13 @@ func methodFacts(req *methodFactsInput) (domain.MethodFacts, methodDocInput) {
 
 func newMethodFacts(ctx *extractCtx, method methodDecl) domain.MethodFacts {
 	return domain.MethodFacts{
-		Name:     method.fn.Name(),
-		Exported: method.fn.Exported(),
-		Pos:      position(ctx.pkg.Fset, ctx.baseDir, method.decl.Pos()),
-		Lines:    lineCount(ctx.pkg.Fset, method.decl.Pos(), method.decl.End()),
+		Name:           method.fn.Name(),
+		Exported:       method.fn.Exported(),
+		Pos:            position(ctx.pkg.Fset, ctx.baseDir, method.decl.Pos()),
+		Lines:          lineCount(ctx.pkg.Fset, method.decl.Pos(), method.decl.End()),
+		FieldsUsed:     zerovalue.Of[bitset.FieldSet](),
+		CalledSiblings: nil,
+		Branches:       zerovalue.Of[domain.BranchStats](),
 	}
 }
 
@@ -977,6 +986,7 @@ func mergePackage(byPath map[string]*packages.Package, order *[]string, pkg *pac
 func filterPackages(req *filterPackagesRequest) (pkgs []*packages.Package, errs []string) {
 	state := packageFilterState{
 		pkgs: make([]*packages.Package, zero, len(req.order)),
+		errs: nil,
 	}
 
 	for i := range req.order {
@@ -1117,7 +1127,7 @@ func structFields(named *types.Named, refs *refCollector) structFieldsResult {
 	structType, ok := named.Underlying().(*types.Struct)
 
 	if !ok {
-		return structFieldsResult{}
+		return zerovalue.Of[structFieldsResult]()
 	}
 
 	return collectStructFields(structType, refs)

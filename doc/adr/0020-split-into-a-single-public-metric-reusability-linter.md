@@ -1,4 +1,4 @@
-# 20. Split into a single-public-metric reusability linter
+# 20. Split into a Single-Public-Metric Reusability Linter
 
 Date: 2026-09-02
 

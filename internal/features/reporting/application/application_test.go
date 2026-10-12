@@ -25,6 +25,46 @@ type trackingWriteCloser struct {
 	err    error
 }
 
+type closeFailWriter struct{ err error }
+
+func (writer closeFailWriter) Write(payload []byte) (int, error) { return len(payload), nil }
+func (writer closeFailWriter) Close() error                      { return writer.err }
+
+type shortWriter struct{}
+
+func (shortWriter) Write(payload []byte) (int, error) { return len(payload) - 1, nil }
+
+func TestRenderDestinationFailures(t *testing.T) {
+	sentinel := errors.New("destination failed")
+	if err := Write(
+		&WriteRequest{
+			Report: sampleReport(),
+			Format: domain.FormatJSON,
+			Sink:   writerSink(closeFailWriter{sentinel}),
+		},
+	); !errors.Is(
+		err,
+		sentinel,
+	) {
+		t.Fatalf("close report = %v", err)
+	}
+	if err := WriteDocs(writerSink(closeFailWriter{sentinel}), "test"); !errors.Is(err, sentinel) {
+		t.Fatalf("close docs = %v", err)
+	}
+	for _, render := range []func(io.Writer) error{
+		func(writer io.Writer) error { return renderDocs(writer, "test") },
+		func(writer io.Writer) error { return renderWeb(writer, ptrSample()) },
+		func(writer io.Writer) error { return renderJSON(writer, ptrSample()) },
+	} {
+		if err := render(&failWriter{err: sentinel}); !errors.Is(err, sentinel) {
+			t.Fatalf("write = %v", err)
+		}
+	}
+	if err := writeFullString(shortWriter{}, "report", "write"); !errors.Is(err, errShortWrite) {
+		t.Fatalf("short write = %v", err)
+	}
+}
+
 func (writer *trackingWriteCloser) Write([]byte) (int, error) {
 	return 0, writer.err
 }

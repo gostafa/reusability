@@ -3,7 +3,9 @@
 
 package reusability
 
-import "github.com/gostafa/reusability/internal/shared/metrics"
+import (
+	"github.com/gostafa/reusability/internal/shared/metrics"
+)
 
 const (
 	// DependencyScopeProject counts only imports of other analyzed packages.
@@ -29,5 +31,6 @@ const (
 	zero                  = 0
 	defaultPackagePattern = "./..."
 
-	errWrapQuoted = "%w: %q"
+	errWrapQuoted         = "%w: %q"
+	errWrapImplementation = "%w: %v"
 )

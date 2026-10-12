@@ -1,4 +1,4 @@
-# 8. Compute metrics concurrently with a shared worker pool
+# 8. Compute Metrics Concurrently with a Shared Worker Pool
 
 Date: 2026-07-11
 

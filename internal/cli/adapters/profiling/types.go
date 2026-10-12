@@ -4,7 +4,9 @@
 // Package profiling writes CPU and heap profiles for CLI diagnostics.
 package profiling
 
-import "os"
+import (
+	"os"
+)
 
 type (
 	profileDeps = struct {

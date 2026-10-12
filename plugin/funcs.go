@@ -9,6 +9,7 @@ import (
 
 	"github.com/golangci/plugin-module-register/register"
 	"github.com/gostafa/reusability/analyzer"
+	"github.com/gostafa/reusability/internal/shared/zerovalue"
 	"golang.org/x/tools/go/analysis"
 )
 
@@ -48,19 +49,19 @@ func analyzerBuilder(settings *analyzer.Settings) func() ([]*analysis.Analyzer, 
 
 func decodePluginSettings(raw any) (analyzer.Settings, error) {
 	if raw == nil {
-		return analyzer.Settings{}, nil
+		return zerovalue.Of[analyzer.Settings](), nil
 	}
 
 	data, err := json.Marshal(raw)
 	if err != nil {
-		return analyzer.Settings{}, fmt.Errorf("marshal settings: %w", err)
+		return zerovalue.Of[analyzer.Settings](), fmt.Errorf("marshal settings: %w", err)
 	}
 
 	var settings analyzer.Settings
 
 	err = analyzer.UnmarshalSettings(data, &settings)
 	if err != nil {
-		return analyzer.Settings{}, fmt.Errorf("decode settings: %w", err)
+		return zerovalue.Of[analyzer.Settings](), fmt.Errorf("decode settings: %w", err)
 	}
 
 	return settings, nil
@@ -83,5 +84,5 @@ func (loadMode) value() string {
 // GetLoadMode requests type information so diagnostics can locate type
 // declarations accurately.
 func (Plugin) GetLoadMode() string {
-	return loadMode{}.value()
+	return new(loadMode).value()
 }

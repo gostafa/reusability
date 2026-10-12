@@ -12,6 +12,7 @@ import (
 	"github.com/gostafa/reusability/internal/features/projectanalysis/ports/inbound"
 	"github.com/gostafa/reusability/internal/shared/metrics"
 	"github.com/gostafa/reusability/internal/shared/version"
+	"github.com/gostafa/reusability/internal/shared/zerovalue"
 )
 
 // AllMetrics returns every reported metric name. This linter reports one.
@@ -32,14 +33,14 @@ func Analyze(ctx context.Context, config *Config) (Report, error) {
 
 	err := validateConfig(&cfg)
 	if err != nil {
-		return Report{}, fmt.Errorf("%w: %v", ErrConfig, err)
+		return zerovalue.Of[Report](), fmt.Errorf(errWrapImplementation, ErrConfig, err)
 	}
 
 	opts := toInbound(&cfg)
 
 	result, analyzeErr := analyzer.NewAnalyzer()(ctx, &opts)
 	if analyzeErr != nil {
-		return Report{}, fmt.Errorf("%w: %v", ErrAnalysis, analyzeErr)
+		return zerovalue.Of[Report](), fmt.Errorf(errWrapImplementation, ErrAnalysis, analyzeErr)
 	}
 
 	return toReport(&result), nil
@@ -65,7 +66,7 @@ func configWithDefaults(cfg *Config) Config {
 		out.FieldUsageMode = FieldUsageDirect
 	}
 
-	if (out.ReusabilityWeights == Weights{}) {
+	if out.ReusabilityWeights == zerovalue.Of[Weights]() {
 		out.ReusabilityWeights = metrics.DefaultReusabilityWeights()
 	}
 
@@ -152,6 +153,7 @@ func validateConfigValues(cfg *Config) error {
 	}
 
 	weights := metrics.ReusabilityWeights(cfg.ReusabilityWeights)
+
 	err := weights.Validate()
 	if err != nil {
 		return fmt.Errorf("reusability weights: %w", err)

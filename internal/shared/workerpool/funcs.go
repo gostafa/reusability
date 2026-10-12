@@ -7,6 +7,9 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"sync"
+
+	"github.com/gostafa/reusability/internal/shared/zerovalue"
 )
 
 // Run executes fn(i) for every i in [0, taskCount) on at most workers
@@ -96,6 +99,7 @@ func newPool(cfg RunConfig) *pool {
 	workerPool := &pool{
 		tasks: make(chan int),
 		errs:  make([]error, cfg.TaskCount),
+		wg:    zerovalue.Of[sync.WaitGroup](),
 	}
 
 	workerPool.wg.Add(workers)

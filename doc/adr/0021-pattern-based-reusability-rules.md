@@ -1,4 +1,4 @@
-# 21. Pattern-based reusability rules
+# 21. Pattern-Based Reusability Rules
 
 Date: 2026-09-02
 
@@ -25,9 +25,9 @@ maintain than the value it provided.
 
 2. **Replace the policy model** with `rules: [{ pattern, min }]` matched
    against full package import paths:
-   - `*` matches one path segment; `**` matches zero or more segments.
-   - Multiple matching rules apply the strictest (highest `min`).
-   - Skip types where reusability is not applicable.
+   * `*` matches one path segment; `**` matches zero or more segments.
+   * Multiple matching rules apply the strictest (highest `min`).
+   * Skip types where reusability is not applicable.
 
 3. **Plugin**: empty/missing `rules` → `DefaultRules()` (`[{ pattern: "**", min: 0.7 }]`).
 
@@ -38,7 +38,7 @@ maintain than the value it provided.
    component calculation; public reports expose only type name and reusability
    (schema v6).
 
-## Schema v6 (2026-09-02)
+## Schema V6 (2026-09-02)
 
 Public reports now carry only `package.path`, `type.name`, and
 `type.reusability` (value, applicable, reason, definition). Removed from
@@ -48,10 +48,10 @@ counts and details, and the metrics map. Internal computation is unchanged;
 
 ## Consequences
 
-- Simpler configuration and violation messages focused on reusability.
-- Structural parts of ADR 0017/0018 policy config are superseded for gating.
-- Schema v5 breaks consumers of package func/var/const counts in JSON reports.
-- Schema v6 breaks consumers of Ca/Ce, type structural facts, and the metrics
+* Simpler configuration and violation messages focused on reusability.
+* Structural parts of ADR 0017/0018 policy config are superseded for gating.
+* Schema v5 breaks consumers of package func/var/const counts in JSON reports.
+* Schema v6 breaks consumers of Ca/Ce, type structural facts, and the metrics
   map; each type now has a single `reusability` object.
-- golangci-lint settings must migrate from `package`/`type`/`funcs`/`metrics`
+* golangci-lint settings must migrate from `package`/`type`/`funcs`/`metrics`
   blocks to `rules`.

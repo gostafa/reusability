@@ -1,4 +1,4 @@
-# 19. Dual-mode: CLI library and golangci-lint Module Plugin
+# 19. Dual-Mode: CLI Library and Golangci-Lint Module Plugin
 
 Date: 2026-07-17
 

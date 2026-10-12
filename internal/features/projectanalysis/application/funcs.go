@@ -14,6 +14,7 @@ import (
 	tfoutbound "github.com/gostafa/reusability/internal/features/typefacts/ports/outbound"
 	"github.com/gostafa/reusability/internal/shared/metrics"
 	"github.com/gostafa/reusability/internal/shared/workerpool"
+	"github.com/gostafa/reusability/internal/shared/zerovalue"
 )
 
 // NewPipeline returns a pipeline backed by the given fact collector.
@@ -37,12 +38,12 @@ func runPipeline(ctx context.Context, input *pipelineInput) (inbound.Result, err
 
 	calculator, err := newReusabilityCalculator(compute, &input.opts.Weights)
 	if err != nil {
-		return inbound.Result{}, fmt.Errorf(errFmtOp, opAnalyze, err)
+		return zerovalue.Of[inbound.Result](), fmt.Errorf(errFmtOp, opAnalyze, err)
 	}
 
 	result, err := runPreparedPipeline(ctx, input, calculator)
 	if err != nil {
-		return inbound.Result{}, fmt.Errorf(errFmtOp, opAnalyze, err)
+		return zerovalue.Of[inbound.Result](), fmt.Errorf(errFmtOp, opAnalyze, err)
 	}
 
 	return result, nil
@@ -55,14 +56,14 @@ func runPreparedPipeline(
 ) (inbound.Result, error) {
 	projectFacts, err := loadFacts(ctx, input.facts, input.opts)
 	if err != nil {
-		return inbound.Result{}, fmt.Errorf(errFmtOp, opAnalyze, err)
+		return zerovalue.Of[inbound.Result](), fmt.Errorf(errFmtOp, opAnalyze, err)
 	}
 
 	result, err := assembleResult(ctx, &workerConfigInput{
-		pipeline: input, facts: projectFacts, calculator: calculator,
+		pipeline: input, facts: projectFacts, calculator: calculator, packageResults: nil,
 	})
 	if err != nil {
-		return inbound.Result{}, fmt.Errorf(errFmtOp, opAssemble, err)
+		return zerovalue.Of[inbound.Result](), fmt.Errorf(errFmtOp, opAssemble, err)
 	}
 
 	return result, nil
@@ -85,7 +86,7 @@ func loadFacts(
 
 func analyzePackage(input *packageAnalysisInput) inbound.PackageResult {
 	pkg := &input.facts.Packages[input.pkgID]
-	result := inbound.PackageResult{Path: pkg.Path}
+	result := inbound.PackageResult{Path: pkg.Path, Types: nil}
 
 	result.Types = make([]inbound.TypeResult, zero, len(pkg.TypeIDs))
 
@@ -115,12 +116,12 @@ func assembleResult(
 ) (inbound.Result, error) {
 	err := ctx.Err()
 	if err != nil {
-		return inbound.Result{}, fmt.Errorf(errFmtOp, opAssemble, err)
+		return zerovalue.Of[inbound.Result](), fmt.Errorf(errFmtOp, opAssemble, err)
 	}
 
 	packageResults, err := fillPackageResults(ctx, input)
 	if err != nil {
-		return inbound.Result{}, fmt.Errorf(errFmtOp, opAssemble, err)
+		return zerovalue.Of[inbound.Result](), fmt.Errorf(errFmtOp, opAssemble, err)
 	}
 
 	return inbound.Result{ModulePath: input.facts.ModulePath, Packages: packageResults}, nil
@@ -153,7 +154,7 @@ func fillPackageResults(
 	packageResults := make([]inbound.PackageResult, zero, len(input.facts.Packages))
 
 	for range input.facts.Packages {
-		packageResults = append(packageResults, inbound.PackageResult{})
+		packageResults = append(packageResults, zerovalue.Of[inbound.PackageResult]())
 	}
 
 	input.packageResults = packageResults
@@ -217,7 +218,7 @@ func typeReusability(
 	fieldUsage string,
 ) metrics.MetricResult {
 	if calculator == nil {
-		return metrics.MetricResult{}
+		return zerovalue.Of[metrics.MetricResult]()
 	}
 
 	return calculator(typeFacts, fieldUsage).Reusability

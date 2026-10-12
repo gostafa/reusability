@@ -1,4 +1,4 @@
-# 4. Enforce domain purity with an architecture guard test
+# 4. Enforce Domain Purity with an Architecture Guard Test
 
 Date: 2026-07-11
 

@@ -1,4 +1,4 @@
-# 2. Adopt hexagonal architecture with feature slices
+# 2. Adopt Hexagonal Architecture with Feature Slices
 
 Date: 2026-07-11
 
@@ -18,14 +18,14 @@ hard to trust.
 
 Structure `internal/` as ports-and-adapters with vertical feature slices:
 
-- `internal/features/<feature>/{domain,application,ports}` for each analysis
+* `internal/features/<feature>/{domain,application,ports}` for each analysis
   concern (architecture, cohesion, complexity, projectanalysis, reporting,
   reusability, typefacts). Domain holds pure logic, application orchestrates,
   ports declare inbound/outbound interfaces.
-- `internal/infrastructure/` holds the adapters that implement the ports:
+* `internal/infrastructure/` holds the adapters that implement the ports:
   `analyzer` (pipeline wiring), `goloader` (compiler frontend), `profiling`,
   and `sinks` (output writers).
-- `internal/shared/` is the shared kernel: `metrics`, `bitset`, `version`,
+* `internal/shared/` is the shared kernel: `metrics`, `bitset`, `version`,
   `workerpool`.
 
 ## Consequences

@@ -3,11 +3,17 @@
 
 package version
 
-import "runtime/debug"
+import (
+	"runtime/debug"
+)
 
 // Version returns the module version from build info, or "dev" for local builds.
 func Version() string {
-	info, ok := debug.ReadBuildInfo()
+	return readVersion(debug.ReadBuildInfo)
+}
+
+func readVersion(read func() (*debug.BuildInfo, bool)) string {
+	info, ok := read()
 
 	if !ok {
 		return fallbackVersion

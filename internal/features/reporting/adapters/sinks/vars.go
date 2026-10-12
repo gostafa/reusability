@@ -3,6 +3,8 @@
 
 package sinks
 
-import "errors"
+import (
+	"errors"
+)
 
 var errStdoutUnavailable = errors.New("stdout is unavailable")

@@ -1,4 +1,4 @@
-# 6. Keep dependencies minimal
+# 6. Keep Dependencies Minimal
 
 Date: 2026-07-11
 

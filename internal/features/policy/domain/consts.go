@@ -16,5 +16,4 @@ const (
 	doubleStar            = "**"
 
 	errFmtKeyed = "%s: %w"
-	errFmtWrite = "writef: %w"
 )

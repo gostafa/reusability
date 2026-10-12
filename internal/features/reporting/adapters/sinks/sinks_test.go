@@ -4,6 +4,9 @@
 package sinks
 
 import (
+	"bufio"
+	"bytes"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,6 +16,34 @@ import (
 )
 
 // Black-box: FileSink round-trips a report body through the port.
+type failedWriter struct{ err error }
+
+func (writer failedWriter) Write([]byte) (int, error) { return 0, writer.err }
+
+func TestSinkFailures(t *testing.T) {
+	if _, err := OpenFile(FileSink{Path: t.TempDir()}); err == nil {
+		t.Fatal("directory accepted")
+	}
+	old := os.Stdout
+	os.Stdout = nil
+	t.Cleanup(func() { os.Stdout = old })
+	if _, err := OpenStdout(); err == nil {
+		t.Fatal("nil stdout accepted")
+	}
+	sentinel := errors.New("write failure")
+	stream := stdoutStream{writer: bufio.NewWriterSize(failedWriter{sentinel}, 1)}
+	if _, err := stream.Write(bytes.Repeat([]byte("x"), 1024)); !errors.Is(err, sentinel) {
+		t.Fatalf("write = %v", err)
+	}
+	stream = stdoutStream{writer: bufio.NewWriter(failedWriter{sentinel})}
+	if _, err := stream.Write([]byte("small")); err != nil {
+		t.Fatal(err)
+	}
+	if err := stream.Close(); !errors.Is(err, sentinel) {
+		t.Fatalf("flush = %v", err)
+	}
+}
+
 func TestFileSinkRoundTrip(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "report.json")

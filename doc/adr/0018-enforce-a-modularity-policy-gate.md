@@ -1,4 +1,4 @@
-# 18. Enforce a modularity policy gate
+# 18. Enforce a Modularity Policy Gate
 
 Date: 2026-07-13
 

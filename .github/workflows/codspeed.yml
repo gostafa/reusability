@@ -2,10 +2,10 @@
 name: CodSpeed
 
 on:
-  push:
-    branches:
-      - main
-  pull_request: null
+  # push:
+  #   branches:
+  #     - main
+  # pull_request: null
   # Allows CodSpeed to trigger backtest performance analysis to generate initial data.
   workflow_dispatch: null
 
