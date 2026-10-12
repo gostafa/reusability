@@ -3,6 +3,7 @@
 
 [![`Workflow for reusability Action`](https://github.com/gostafa/reusability/actions/workflows/main.yml/badge.svg)](https://github.com/gostafa/reusability/actions/workflows/main.yml)
 [![codecov](https://codecov.io/gh/gostafa/reusability/graph/badge.svg)](https://codecov.io/gh/gostafa/reusability)
+[![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://app.codspeed.io/gostafa/reusability?utm_source=badge)
 
 `reusability` analyzes Go named types and reports the **reusability index** per
 type. Reports show only package path, type name, and reusability — no structural
