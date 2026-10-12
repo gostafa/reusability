@@ -1,9 +1,6 @@
 # Reusability
 
-
-[![`Workflow for reusability Action`](https://github.com/gostafa/reusability/actions/workflows/main.yml/badge.svg)](https://github.com/gostafa/reusability/actions/workflows/main.yml)
-[![codecov](https://codecov.io/gh/gostafa/reusability/graph/badge.svg)](https://codecov.io/gh/gostafa/reusability)
-[![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://app.codspeed.io/gostafa/reusability?utm_source=badge)
+[![`Workflow for reusability Action`](https://github.com/gostafa/reusability/actions/workflows/main.yml/badge.svg)](https://github.com/gostafa/reusability/actions/workflows/main.yml) [![codecov](https://codecov.io/gh/gostafa/reusability/graph/badge.svg)](https://codecov.io/gh/gostafa/reusability) ![Go Reference](https://pkg.go.dev/badge/github.com/gostafa/reusability)](https://pkg.go.dev/github.com/gostafa/reusability)
 
 `reusability` analyzes Go named types and reports the **reusability index** per
 type. Reports show only package path, type name, and reusability — no structural
@@ -20,6 +17,21 @@ It can run as:
 Go callers import `github.com/gostafa/reusability` and use `Analyze` with
 `Config` to obtain a `Report`. `ErrConfig` and `ErrAnalysis` identify failures
 with `errors.Is`.
+
+Each `Analyze` call loads fresh source. An analyzer created for `go/analysis`
+or the plugin instead shares one lazy analysis result across its package
+passes. It snapshots its settings at construction and caches either the
+result or the failure for that instance; create a new analyzer to analyze
+changed source or try again after a failed run. Shared initialization has
+no fixed timeout and is attempted once.
+
+Package loading retries typed transient system and network timeout failures
+up to three total attempts. Delays start at 100 ms, double with ±20% jitter,
+and have a nominal ceiling of 500 ms. A two-second scheduling budget limits
+additional attempts without interrupting an ongoing load; the caller's
+context cancels loading and retry waits. Untyped Go-tool errors, package
+diagnostics, and unmatched patterns are not retried. Output writes, browser
+launching, and profiling run once.
 
 ## Use as a CLI
 

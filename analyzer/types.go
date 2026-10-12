@@ -6,7 +6,6 @@ package analyzer
 
 import (
 	"context"
-	"sync"
 
 	"github.com/gostafa/reusability"
 	policydomain "github.com/gostafa/reusability/internal/features/policy/domain"
@@ -16,11 +15,7 @@ type (
 	reportAnalyzer = func(ctx context.Context, cfg *reusability.Config) (reusability.Report, error)
 
 	runner = struct {
-		analyzer reportAnalyzer
-		err      error
-		byPkg    map[string][]policydomain.Violation
-		settings Settings
-		once     sync.Once
+		get func(context.Context) (map[string][]policydomain.Violation, error)
 	}
 
 	runResult struct{}

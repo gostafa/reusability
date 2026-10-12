@@ -6,16 +6,21 @@ package goloader
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
+	"net"
 	"os"
 	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
+	"syscall"
+	"time"
 
+	"github.com/cenkalti/backoff/v7"
 	"github.com/gostafa/reusability/internal/features/typefacts/domain"
 	"github.com/gostafa/reusability/internal/features/typefacts/ports/outbound"
 	"github.com/gostafa/reusability/internal/shared/bitset"
@@ -608,7 +613,11 @@ func loadPackageList(
 	patterns []string,
 ) ([]*packages.Package, []string, error) {
 	// loadPackageList.
-	loaded, err := deps.packagesLoad(cfg, patterns...)
+	loaded, err := retryPackageList(
+		deps,
+		&packageLoadRequest{config: cfg, patterns: patterns},
+		loadRetryBudget,
+	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("load packages: %w", err)
 	}
@@ -618,6 +627,127 @@ func loadPackageList(
 	}
 
 	return loaded, patterns, nil
+}
+
+func retryPackageList(
+	deps *loaderDeps,
+	req *packageLoadRequest,
+	budget time.Duration,
+) ([]*packages.Package, error) {
+	loaded, err := backoff.Retry(req.config.Context, func() ([]*packages.Package, error) {
+		return loadPackageAttempt(deps, req.config, req.patterns)
+	}, backoff.WithBackOff(packageLoadBackoff()),
+		backoff.WithMaxTries(loadMaxAttempts), backoff.WithMaxElapsedTime(budget))
+	if err != nil {
+		return nil, fmt.Errorf("retry package load: %w", packageLoadError(req.config.Context, err))
+	}
+
+	return loaded, nil
+}
+
+func packageLoadBackoff() *backoff.ExponentialBackOff {
+	policy := backoff.NewExponentialBackOff()
+
+	policy.InitialInterval = loadRetryInitial
+	policy.MaxInterval = loadRetryMaximum
+	policy.Multiplier = loadRetryMultiplier
+	policy.RandomizationFactor = loadRetryJitter
+
+	return policy
+}
+
+func loadPackageAttempt(
+	deps *loaderDeps,
+	cfg *packages.Config,
+	patterns []string,
+) ([]*packages.Package, error) {
+	cause := context.Cause(cfg.Context)
+	if cause != nil {
+		return nil, fmt.Errorf("package load canceled before attempt: %w", backoff.Permanent(cause))
+	}
+
+	loaded, err := deps.packagesLoad(cloneLoadConfig(cfg), slices.Clone(patterns)...)
+
+	loaded, err = finishPackageAttempt(cfg.Context, loaded, err)
+	if err != nil {
+		return nil, fmt.Errorf("package load attempt: %w", err)
+	}
+
+	return loaded, nil
+}
+
+func cloneLoadConfig(cfg *packages.Config) *packages.Config {
+	out := *cfg
+
+	out.BuildFlags = slices.Clone(cfg.BuildFlags)
+	out.Env = slices.Clone(cfg.Env)
+
+	return &out
+}
+
+func finishPackageAttempt(
+	ctx context.Context,
+	loaded []*packages.Package,
+	err error,
+) ([]*packages.Package, error) {
+	cause := context.Cause(ctx)
+	if cause != nil {
+		return nil, fmt.Errorf(errFmtPackageCanceled, backoff.Permanent(cause))
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("package load failure: %w", classifyLoadError(err))
+	}
+
+	return loaded, nil
+}
+
+func classifyLoadError(err error) error {
+	if transientLoadError(err) {
+		return fmt.Errorf("temporary package load failure: %w", err)
+	}
+
+	return fmt.Errorf("permanent package load failure: %w", backoff.Permanent(err))
+}
+
+func transientLoadError(err error) bool {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+
+	return transientSystemError(err) || transientNetworkError(err)
+}
+
+func transientSystemError(err error) bool {
+	transient := []syscall.Errno{
+		syscall.EINTR, syscall.EAGAIN, syscall.EMFILE, syscall.ENFILE,
+		syscall.ETIMEDOUT, syscall.ECONNRESET, syscall.ECONNABORTED,
+	}
+
+	for index := range transient {
+		if errors.Is(err, transient[index]) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func transientNetworkError(err error) bool {
+	var networkError net.Error
+
+	return errors.As(err, &networkError) && networkError.Timeout()
+}
+
+func packageLoadError(ctx context.Context, err error) error {
+	cause := context.Cause(ctx)
+	if cause != nil {
+		return fmt.Errorf(errFmtPackageCanceled, cause)
+	}
+
+	failure := backoff.AsRetryError(err)
+
+	return fmt.Errorf("package load failed: %w", failure.LastErr)
 }
 
 func packagePatterns(opts *outbound.FactOptions) []string {

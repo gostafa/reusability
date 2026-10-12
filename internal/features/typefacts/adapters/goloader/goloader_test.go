@@ -11,17 +11,220 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"net"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
+	"github.com/cenkalti/backoff/v7"
 	"github.com/gostafa/reusability/internal/features/typefacts/domain"
 	"github.com/gostafa/reusability/internal/features/typefacts/ports/outbound"
 	"github.com/gostafa/reusability/internal/shared/workerpool"
 	"golang.org/x/tools/go/packages"
 )
+
+func TestTransientLoadErrorClassification(t *testing.T) {
+	t.Parallel()
+	for _, transient := range []error{
+		syscall.EINTR, syscall.EAGAIN, syscall.EMFILE, syscall.ENFILE,
+		syscall.ETIMEDOUT, syscall.ECONNRESET, syscall.ECONNABORTED,
+		&net.DNSError{IsTimeout: true},
+	} {
+		err := fmt.Errorf("wrapped: %w", &os.PathError{Op: "load", Path: "module", Err: transient})
+		if !transientLoadError(err) {
+			t.Errorf("transient failure rejected: %v", err)
+		}
+	}
+	for _, permanent := range []error{
+		context.Canceled, context.DeadlineExceeded, os.ErrPermission, os.ErrNotExist,
+		&net.DNSError{IsTemporary: true}, errors.New("go tool failed"),
+	} {
+		if transientLoadError(fmt.Errorf("wrapped: %w", permanent)) {
+			t.Errorf("permanent failure retried: %v", permanent)
+		}
+	}
+}
+
+func TestPackageLoadRetryRecoveryAndFreshInputs(t *testing.T) {
+	t.Parallel()
+	deps := defaultLoaderDeps()
+	cfg := &packages.Config{
+		Context:    t.Context(),
+		Dir:        "original",
+		BuildFlags: []string{"-tags=original"},
+		Env:        []string{"KEY=original"},
+	}
+	patterns := []string{"./original"}
+	want := healthy("m/a", "a.go")
+	var attempts []*packages.Config
+	deps.packagesLoad = func(attempt *packages.Config, gotPatterns ...string) ([]*packages.Package, error) {
+		if attempt.Context != cfg.Context || attempt.Dir != "original" ||
+			attempt.BuildFlags[0] != "-tags=original" || attempt.Env[0] != "KEY=original" || gotPatterns[0] != "./original" {
+			t.Errorf("retry inputs changed: %+v, %v", attempt, gotPatterns)
+		}
+		attempts = append(attempts, attempt)
+		attempt.Dir = "mutated"
+		attempt.BuildFlags[0] = "-tags=mutated"
+		attempt.Env[0] = "KEY=mutated"
+		gotPatterns[0] = "./mutated"
+		if len(attempts) < 3 {
+			return []*packages.Package{healthy("m/partial", "partial.go")}, syscall.EAGAIN
+		}
+		return []*packages.Package{want}, nil
+	}
+	got, err := retryPackageList(
+		deps,
+		&packageLoadRequest{config: cfg, patterns: patterns},
+		loadRetryBudget,
+	)
+	if err != nil || len(got) != 1 || got[0] != want || len(attempts) != 3 {
+		t.Fatalf("recovery = %v, %v; attempts = %d", got, err, len(attempts))
+	}
+	if attempts[0] == attempts[1] || attempts[1] == attempts[2] {
+		t.Fatal("retry reused a mutable configuration")
+	}
+	if cfg.Dir != "original" || cfg.BuildFlags[0] != "-tags=original" ||
+		cfg.Env[0] != "KEY=original" ||
+		patterns[0] != "./original" {
+		t.Fatalf("caller inputs mutated: %+v, %v", cfg, patterns)
+	}
+}
+
+func TestPackageLoadRetryFailureBudgets(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name     string
+		failure  error
+		budget   time.Duration
+		attempts int
+	}{
+		{name: "attempts", failure: syscall.EMFILE, budget: loadRetryBudget, attempts: 3},
+		{name: "scheduling", failure: syscall.EAGAIN, budget: time.Nanosecond, attempts: 1},
+		{name: "unknown", failure: errors.New("go tool failed"), budget: loadRetryBudget, attempts: 1},
+		{name: "permission", failure: os.ErrPermission, budget: loadRetryBudget, attempts: 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			deps := defaultLoaderDeps()
+			calls := 0
+			deps.packagesLoad = func(*packages.Config, ...string) ([]*packages.Package, error) {
+				calls++
+				return []*packages.Package{healthy("m/partial", "partial.go")}, test.failure
+			}
+			got, err := retryPackageList(
+				deps,
+				&packageLoadRequest{
+					config:   &packages.Config{Context: t.Context()},
+					patterns: []string{"./"},
+				},
+				test.budget,
+			)
+			var retryErr *backoff.RetryError
+			if got != nil || !errors.Is(err, test.failure) || calls != test.attempts ||
+				errors.As(err, &retryErr) {
+				t.Fatalf("failure = %v, %v; calls = %d", got, err, calls)
+			}
+		})
+	}
+}
+
+func TestPackageLoadCancellationBeforeAndDuringAttempt(t *testing.T) {
+	t.Parallel()
+	for _, alreadyCanceled := range []bool{false, true} {
+		ctx, cancel := context.WithCancelCause(t.Context())
+		sentinel := errors.New("stop loading")
+		if alreadyCanceled {
+			cancel(sentinel)
+		}
+		deps := defaultLoaderDeps()
+		calls := 0
+		deps.packagesLoad = func(cfg *packages.Config, _ ...string) ([]*packages.Package, error) {
+			calls++
+			if cfg.Context != ctx {
+				t.Error("caller context was lost")
+			}
+			cancel(sentinel)
+			return nil, syscall.EAGAIN
+		}
+		got, err := retryPackageList(
+			deps,
+			&packageLoadRequest{config: &packages.Config{Context: ctx}},
+			loadRetryBudget,
+		)
+		cancel(sentinel)
+		wantCalls := 1
+		if alreadyCanceled {
+			wantCalls = 0
+		}
+		if got != nil || !errors.Is(err, sentinel) || errors.Is(err, syscall.EAGAIN) ||
+			calls != wantCalls {
+			t.Fatalf("cancel = %v, %v; calls = %d", got, err, calls)
+		}
+	}
+}
+
+func TestPackageLoadCancellationDuringBackoff(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancelCause(t.Context())
+	defer cancel(nil)
+	sentinel := errors.New("stop waiting")
+	deps := defaultLoaderDeps()
+	calls := 0
+	var cancellation *time.Timer
+	deps.packagesLoad = func(*packages.Config, ...string) ([]*packages.Package, error) {
+		calls++
+		cancellation = time.AfterFunc(20*time.Millisecond, func() { cancel(sentinel) })
+		return nil, syscall.EAGAIN
+	}
+	got, err := retryPackageList(
+		deps,
+		&packageLoadRequest{config: &packages.Config{Context: ctx}},
+		loadRetryBudget,
+	)
+	cancellation.Stop()
+	if got != nil || !errors.Is(err, sentinel) || calls != 1 {
+		t.Fatalf("backoff cancellation = %v, %v; calls = %d", got, err, calls)
+	}
+}
+
+func TestPackageLoadSchedulingBudgetAllowsCompletedAttempt(t *testing.T) {
+	t.Parallel()
+	deps := defaultLoaderDeps()
+	deps.packagesLoad = func(*packages.Config, ...string) ([]*packages.Package, error) {
+		return []*packages.Package{healthy("m/a", "a.go")}, nil
+	}
+	got, err := retryPackageList(
+		deps,
+		&packageLoadRequest{config: &packages.Config{Context: t.Context()}},
+		time.Nanosecond,
+	)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("completed attempt = %v, %v", got, err)
+	}
+}
+
+func TestPackageLoadCancellationDiscardsSuccessfulResult(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	deps := defaultLoaderDeps()
+	deps.packagesLoad = func(*packages.Config, ...string) ([]*packages.Package, error) {
+		cancel()
+		return []*packages.Package{healthy("m/a", "a.go")}, nil
+	}
+	got, err := retryPackageList(
+		deps,
+		&packageLoadRequest{config: &packages.Config{Context: ctx}},
+		loadRetryBudget,
+	)
+	if got != nil || !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled result = %v, %v", got, err)
+	}
+}
 
 func writeModule(t *testing.T, files map[string]string) string {
 	t.Helper()

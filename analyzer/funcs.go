@@ -13,11 +13,13 @@ import (
 	"go/token"
 	"math"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/gostafa/reusability"
 	policydomain "github.com/gostafa/reusability/internal/features/policy/domain"
+	"github.com/gostafa/reusability/internal/features/projectanalysis/adapters/resultcache"
 	"github.com/gostafa/reusability/internal/shared/metrics"
 	"golang.org/x/tools/go/analysis"
 )
@@ -245,10 +247,10 @@ func settingsWithDefaults(settings *Settings) Settings {
 	return out
 }
 
-// Analyze delegates to the adapted function.
 // computeViolations performs the fallible analysis work before the runner
 // caches its result for subsequent package passes.
 func computeViolations(
+	ctx context.Context,
 	settings *Settings,
 	analyzer reportAnalyzer,
 ) (map[string][]policydomain.Violation, error) {
@@ -259,7 +261,7 @@ func computeViolations(
 
 	cfg := settingsToConfig(settings)
 
-	report, err := analyzer(context.Background(), &cfg)
+	report, err := analyzer(ctx, &cfg)
 	if err != nil {
 		return nil, fmt.Errorf("reusability analyze: %w", err)
 	}
@@ -322,12 +324,58 @@ func groupByPackage(violations []policydomain.Violation) map[string][]policydoma
 }
 
 func newRunner(settings *Settings) *runner {
-	state := new(runner)
+	return newRunnerWith(settings, reusability.Analyze)
+}
 
-	state.settings = *settings
-	state.analyzer = reusability.Analyze
+func newRunnerWith(settings *Settings, analyze reportAnalyzer) *runner {
+	snapshot := snapshotSettings(settings)
 
-	return state
+	return &runner{
+		get: resultcache.New(
+			func(ctx context.Context) (map[string][]policydomain.Violation, error) {
+				return computeViolations(ctx, &snapshot, analyze)
+			},
+		),
+	}
+}
+
+func snapshotSettings(settings *Settings) Settings {
+	out := *settings
+
+	out.Patterns = slices.Clone(settings.Patterns)
+	out.BuildTags = slices.Clone(settings.BuildTags)
+	out.Rules = slices.Clone(settings.Rules)
+
+	for index := range out.Rules {
+		out.Rules[index].Min = cloneFloat(out.Rules[index].Min)
+	}
+
+	out.ReusabilityWeights = snapshotWeights(settings.ReusabilityWeights)
+
+	return out
+}
+
+func snapshotWeights(weights *ReusabilityWeightSettings) *ReusabilityWeightSettings {
+	if weights == nil {
+		return nil
+	}
+
+	return &ReusabilityWeightSettings{
+		Cohesion:      cloneFloat(weights.Cohesion),
+		Coupling:      cloneFloat(weights.Coupling),
+		Testability:   cloneFloat(weights.Testability),
+		Documentation: cloneFloat(weights.Documentation),
+	}
+}
+
+func cloneFloat(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+
+	copyValue := *value
+
+	return &copyValue
 }
 
 // packagePos returns a position for package-scoped diagnostics: the package
@@ -410,18 +458,13 @@ func reportViolations(pass *analysis.Pass, violations []policydomain.Violation) 
 	}
 }
 
-func loadRunner(state *runner) {
-	state.byPkg, state.err = computeViolations(&state.settings, state.analyzer)
-}
-
 func runRunner(state *runner, pass *analysis.Pass) (*runResult, error) {
-	state.once.Do(func() { loadRunner(state) })
-
-	if state.err != nil {
-		return nil, fmt.Errorf("run: %w", state.err)
+	byPkg, err := state.get(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("run: %w", err)
 	}
 
-	reportViolations(pass, state.byPkg[pass.Pkg.Path()])
+	reportViolations(pass, byPkg[pass.Pkg.Path()])
 
 	return new(runResult), nil
 }

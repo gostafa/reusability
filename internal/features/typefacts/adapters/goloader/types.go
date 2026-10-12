@@ -27,6 +27,11 @@ type (
 		absPath           func(string) (string, error)
 	}
 
+	packageLoadRequest = struct {
+		config   *packages.Config
+		patterns []string
+	}
+
 	extractorOptions = struct {
 		analyzed   map[string]bool
 		modulePath string

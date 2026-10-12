@@ -4,6 +4,8 @@
 package goloader
 
 import (
+	"time"
+
 	"golang.org/x/tools/go/packages"
 )
 
@@ -17,7 +19,13 @@ const (
 	testPackageSuffix     = ".test"
 	buildTagsPrefix       = "-tags="
 
-	maxShownErrors = 10
+	maxShownErrors      = 10
+	loadMaxAttempts     = 3
+	loadRetryInitial    = 100 * time.Millisecond
+	loadRetryMaximum    = 500 * time.Millisecond
+	loadRetryBudget     = 2 * time.Second
+	loadRetryMultiplier = 2
+	loadRetryJitter     = 0.2
 
 	loadMode = packages.NeedName |
 		packages.NeedModule |
@@ -33,6 +41,7 @@ const (
 	errWrapWithValue = "%w: %v"
 
 	errFmtInvokePackagesLoad = "invoke packages load: %w"
+	errFmtPackageCanceled    = "package load canceled: %w"
 
 	excludeGeneratedFiles generatedInclusion = false
 	includeGeneratedFiles generatedInclusion = true
